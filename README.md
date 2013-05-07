@@ -9,7 +9,7 @@ Motivation
 
 Typically, the software running on a microcontroller has project-specific requirements on clock frequency, pinout and other settings. Since many of these parameters do not change at runtime, these parameters are typically defined at compile time rather than at runtime for efficiency reasons. Therefore, libraries usually have to be compiled with project-specific adjustments prior to being linked to an application. I have seen many people copying library code to their project directories and adjusting it to project-specific requirements. However, having duplicate code in multiple locations compromises maintainability of the original library's source code, especially if it's written by yourself. 
 AVR3nk's build environment allows to organize libraries in a single place. Static parameters (i.e., parameters which do not change at runtime) are defined as macros in the libraries' header files and can be overridden through individual build settings of applications. Furthermore, AVR3nk's build environment allows to declare libraries to be capable of handling various kinds of MCUs. This allows to reuse the same library code in different projects which target different AVR devices. 
-The build environment is based on [Make](http://en.wikipedia.org/wiki/Make_(software) and is controlled via terminal. However, you do not have to write complicated makefiles to get your projects working. In order to build a new library or application, you only have to provide a makefile with some basic information, such as source and header files and the project's location in the directory tree. Lastly, a custom makefile must include the build environment (a one-liner) to provide the full power of cross-directory builds, recursive builds, device programming, and so on. 
+The build environment is based on [Make](http://en.wikipedia.org/wiki/Make_(software)) and is controlled via terminal. However, you do not have to write complicated makefiles to get your projects working. In order to build a new library or application, you only have to provide a makefile with some basic information, such as source and header files and the project's location in the directory tree. Lastly, a custom makefile must include the build environment (a one-liner) to provide the full power of cross-directory builds, recursive builds, device programming, and so on. 
 
 
 Setup
@@ -38,13 +38,13 @@ Make Targets
 The AVR3nk build environment allows to build libraries and applications by running Make commands in a terminal, such as "make all", "make build" or "make program". When one of the specified Make targets is invoked in a directory, it is executed recursively within all subdirectories. E.g., in order to build all libraries and applications at once, call "make all" in AVR3nk's top directory. 
 
 The following Make targets are available: 
-**clean**: Removes all files generated locally by the build environment, such as object code, library archives, Intel hex programming files, etc. When "make clean" is invoked in AVR3nk's top directory, the install directory is removed prior to executing the clean command recursively in each subdirectory. Make a direcotry clean when you need to make sure that all source files are compiled anew in a subsequent call of build. 
-**build**: Compiles the source code. For libraries, it will also create (or update) a library archive if source files were updated. For an application, it will also build library dependencies into the application's build directory and link everything to an executable which can be programmed to AVR hardware. The build command compiles only files that were changed since the last compilation. 
-**headers**: Copies a library's header files to the install directory. 
-**install**: Copies a library's pre-compiled archive file to the install directory. 
-**all**: Rebuilds everything anew by invoking the targets clean, build and install. 
-**program**: This target is only valid for applications. It writes the programming file to the AVR microcontroller by means of avrdude. 
-**size**: Display the size of a program. This target works only for applications. 
+* **clean**: Removes all files generated locally by the build environment, such as object code, library archives, Intel hex programming files, etc. When "make clean" is invoked in AVR3nk's top directory, the install directory is removed prior to executing the clean command recursively in each subdirectory. Make a direcotry clean when you need to make sure that all source files are compiled anew in a subsequent call of build. 
+* **build**: Compiles the source code. For libraries, it will also create (or update) a library archive if source files were updated. For an application, it will also build library dependencies into the application's build directory and link everything to an executable which can be programmed to AVR hardware. The build command compiles only files that were changed since the last compilation. 
+* **headers**: Copies a library's header files to the install directory. 
+* **install**: Copies a library's pre-compiled archive file to the install directory. 
+* **all**: Rebuilds everything anew by invoking the targets clean, build and install. 
+* **program**: This target is only valid for applications. It writes the programming file to the AVR microcontroller by means of avrdude. 
+* **size**: Displays the size of a program. This target works only for applications. 
 
 
 Sample Projects
@@ -86,7 +86,7 @@ The MCU variable contains the supported MCU(s) of the application. If more than 
 Background
 ----------------
 
-AVR3nk was initially created in 2009 at the [Sailing Team Darmstadt e.V.](http://www.st-darmstadt.de), a students' association at [Technische Universität Darmstadt](http://www.tu-darmstadt.de). The team aims to build autonomous and energy-self-sufficient sailing robots. The code available in AVR3nk includes the basic infrastructure for the team's development of sensor and actuator devices. 
+AVR3nk was initially created in 2009 at the [Sailing Team Darmstadt e.V.](http://www.st-darmstadt.de), a students' association at [Technische Universität Darmstadt](http://www.tu-darmstadt.de). The team aims to build autonomous and energy-self-sufficient sailing robots. The code available in AVR3nk includes the team's basic infrastructure for developing sensor and actuator devices. 
 
 
 Contributing

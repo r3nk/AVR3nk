@@ -1,0 +1,105 @@
+################################################################
+##
+## Toolchain flags.
+## This file declares compiler flags, archiver flags and
+## any other flags.
+##
+## Copyright (C) 2009-2013 Robin Klose
+##
+## This file is part of AVR3nk, available at 
+## https://github.com/r3nk/AVR3nk
+##
+################################################################
+
+################################################################
+## Compiler Flags for AVR-GCC
+################################################################
+
+CFLAGS := -mmcu=$(TARGET_MCU)
+CFLAGS += -Wall
+CFLAGS += -gdwarf-2
+CFLAGS += -Os
+CFLAGS += -std=gnu99
+CFLAGS += -funsigned-char
+CFLAGS += -funsigned-bitfields
+CFLAGS += -fpack-struct
+CFLAGS += -fshort-enums
+CFLAGS += -I $(INSTALL_HEADERS_SUBDIR)
+CFLAGS += -D$(TARGET_MCU)=1
+CFLAGS += $(APP_MACROS:%=-D%)
+
+################################################################
+## Archiver Flags for AVR-AR
+################################################################
+
+# Do not warn if archive must be created first:
+ARFLAGS := -c
+
+# Replace members that match the given filenames:
+ARFLAGS += -r
+
+# Creates an index to the symbols defined in relocatable object modules in the archive:
+ARFLAGS += -s
+
+# Print verbose messages when archiving:
+ARFLAGS += -v
+
+################################################################
+## Linker Flags
+################################################################
+
+LDFLAGS  = -mmcu=$(TARGET_MCU)
+LDFLAGS += -Wl,-Map=$(BUILD_PROGRAM_MAP)
+ifneq ($(VERBOSE), 0)
+LDFLAGS += -Wl,--stats
+ifneq ($(VERBOSE), 1)
+LDFLAGS += -Wl,-v
+endif
+endif
+#LDFLAGS += -Wl,-O1
+
+LDDIRS    = -Wl,-L$(INSTALL_LIBRARY_DIR)
+
+LDLIBS    = -Wl,--start-group
+LDLIBS   += $(LIBRARIES:%=-Wl,-l%)
+LDLIBS   += -Wl,--end-group
+
+LDDEPS    = -Wl,--start-group
+LDDEPS   += $(IDEPS_LIBRARIES)
+LDDEPS   += $(RDEPS_LIBRARIES)
+LDDEPS   += -Wl,--end-group
+
+################################################################
+## Object Copy flags for Intel Hex file production
+################################################################
+
+OBJCPY_HEX_FLAGS := -O ihex
+OBJCPY_HEX_FLAGS += -R .eeprom
+
+OBJCPY_EEP_FLAGS := -O ihex
+OBJCPY_EEP_FLAGS += -j .eeprom
+OBJCPY_EEP_FLAGS += --no-change-warnings
+OBJCPY_EEP_FLAGS += --set-section-flags=.eeprom=alloc,load
+OBJCPY_EEP_FLAGS += --change-section-lma .eeprom=0
+
+OBJDUMP_FLAGS    := -h
+OBJDUMP_FLAGS    += -S
+
+################################################################
+## Compiler Flags for dependency generation
+################################################################
+
+DEPENDENCY_FLAGS += -MD
+DEPENDENCY_FLAGS += -MP
+DEPENDENCY_FLAGS += -MT $(*F).o
+DEPENDENCY_FLAGS += -MF dep/$(@F).d
+
+################################################################
+## Assembly specific flags
+################################################################
+
+ASMFLAGS := -mmcu=$(TARGET_MCU)
+ASMFLAGS += $(CFLAGS)
+ASMFLAGS += -x
+ASMFLAGS += assembler-with-cpp
+ASMFLAGS += -Wa,-gdwarf2

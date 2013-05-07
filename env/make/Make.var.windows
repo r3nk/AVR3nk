@@ -1,0 +1,51 @@
+################################################################
+##
+## Windows toolchain variables.
+##
+## Copyright (C) 2009-2013 Robin Klose
+##
+## This file is part of AVR3nk, available at 
+## https://github.com/r3nk/AVR3nk
+##
+################################################################
+
+################################################################
+## WINAVR_DIR path in unix-style
+################################################################
+
+WINAVR_DIR := $(subst \,/,$(WINAVR))
+BINUTILS_DIR := $(WINAVR_DIR)/utils/bin
+
+################################################################
+## STANDARD UTILITIES
+################################################################
+
+ECHO := $(BINUTILS_DIR)/echo.exe
+
+MKDIR := $(BINUTILS_DIR)/mkdir.exe
+MKDIR_P := $(BINUTILS_DIR)/mkdir.exe -p
+
+ifeq ($(VERBOSE),0)
+RM := $(BINUTILS_DIR)/rm.exe
+RM_F := $(BINUTILS_DIR)/rm.exe -f
+RM_RF := $(BINUTILS_DIR)/rm.exe -r -f
+else
+RM := $(BINUTILS_DIR)/rm.exe -v
+RM_F := $(BINUTILS_DIR)/rm.exe -f -v
+RM_RF := $(BINUTILS_DIR)/rm.exe -r -f -v
+endif
+
+CP := $(BINUTILS_DIR)/cp.exe
+CD := cd
+
+################################################################
+## AVR-GCC, BINUTILS and friends
+################################################################
+
+CC := $(WINAVR_DIR)/bin/avr-gcc.exe
+AR := $(WINAVR_DIR)/bin/avr-ar.exe
+LD := $(WINAVR_DIR)/bin/avr-ld.exe
+OBJCPY := $(WINAVR_DIR)/bin/avr-objcopy.exe
+OBJDUMP := $(WINAVR_DIR)/bin/avr-objdump.exe
+SIZE := $(WINAVR_DIR)/bin/avr-size.exe
+AVRDUDE := $(WINAVR_DIR)/bin/avrdude.exe

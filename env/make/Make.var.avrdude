@@ -1,0 +1,681 @@
+################################################################
+##
+## AVRDUDE configuration.
+## Maps avr-gcc specific MCU names to avrdude specific names. 
+##
+## Query MCU names known to avr-gcc: avr-gcc --target-help
+## Query MCU names known to avrdude: avrdude -p?
+##
+## Copyright (C) 2009-2013 Robin Klose
+##
+## This file is part of AVR3nk, available at 
+## https://github.com/r3nk/AVR3nk
+##
+################################################################
+
+ifeq ($(TARGET_MCU), attiny11)
+AVRDUDE_PARTNO := t11
+endif
+
+ifeq ($(TARGET_MCU), attiny12)
+AVRDUDE_PARTNO := t12
+endif
+
+ifeq ($(TARGET_MCU), attiny13)
+AVRDUDE_PARTNO := t13
+endif
+
+ifeq ($(TARGET_MCU), attiny13a)
+AVRDUDE_PARTNO := t13
+endif
+
+ifeq ($(TARGET_MCU), attiny15)
+AVRDUDE_PARTNO := t15
+endif
+
+ifeq ($(TARGET_MCU), attiny22)
+AVRDUDE_PARTNO := 2343
+endif
+
+ifeq ($(TARGET_MCU), attiny24)
+AVRDUDE_PARTNO := t24
+endif
+
+ifeq ($(TARGET_MCU), attiny24a)
+AVRDUDE_PARTNO := t24
+endif
+
+ifeq ($(TARGET_MCU), attiny25)
+AVRDUDE_PARTNO := t25
+endif
+
+ifeq ($(TARGET_MCU), attiny26)
+AVRDUDE_PARTNO := t26
+endif
+
+ifeq ($(TARGET_MCU), attiny44)
+AVRDUDE_PARTNO := t44
+endif
+
+ifeq ($(TARGET_MCU), attiny44a)
+AVRDUDE_PARTNO := t44
+endif
+
+ifeq ($(TARGET_MCU), attiny45)
+AVRDUDE_PARTNO := t45
+endif
+
+ifeq ($(TARGET_MCU), attiny84)
+AVRDUDE_PARTNO := t84
+endif
+
+ifeq ($(TARGET_MCU), attiny85)
+AVRDUDE_PARTNO := t85
+endif
+
+ifeq ($(TARGET_MCU), attiny88)
+AVRDUDE_PARTNO := t88
+endif
+
+ifeq ($(TARGET_MCU), attiny261)
+AVRDUDE_PARTNO := t261
+endif
+
+ifeq ($(TARGET_MCU), attiny261a)
+AVRDUDE_PARTNO := t261
+endif
+
+ifeq ($(TARGET_MCU), attiny461)
+AVRDUDE_PARTNO := t461
+endif
+
+ifeq ($(TARGET_MCU), attiny461a)
+AVRDUDE_PARTNO := t461
+endif
+
+ifeq ($(TARGET_MCU), attiny861)
+AVRDUDE_PARTNO := t861
+endif
+
+ifeq ($(TARGET_MCU), attiny861a)
+AVRDUDE_PARTNO := t861
+endif
+
+ifeq ($(TARGET_MCU), attiny2313)
+AVRDUDE_PARTNO := t2313
+endif
+
+ifeq ($(TARGET_MCU), attiny2313a)
+AVRDUDE_PARTNO := t2313
+endif
+
+ifeq ($(TARGET_MCU), atmega8u2)
+AVRDUDE_PARTNO := m8u2
+endif
+
+ifeq ($(TARGET_MCU), atmega16u2)
+AVRDUDE_PARTNO := m16u2
+endif
+
+ifeq ($(TARGET_MCU), atmega32u2)
+AVRDUDE_PARTNO := m32u2
+endif
+
+ifeq ($(TARGET_MCU), atmega48)
+AVRDUDE_PARTNO := m48
+endif
+
+ifeq ($(TARGET_MCU), atmega48a)
+AVRDUDE_PARTNO := m48
+endif
+
+ifeq ($(TARGET_MCU), atmega48p)
+AVRDUDE_PARTNO := m48p
+endif
+
+ifeq ($(TARGET_MCU), atmega88)
+AVRDUDE_PARTNO := m88
+endif
+
+ifeq ($(TARGET_MCU), atmega88a)
+AVRDUDE_PARTNO := m88
+endif
+
+ifeq ($(TARGET_MCU), atmega88p)
+AVRDUDE_PARTNO := m88p
+endif
+
+ifeq ($(TARGET_MCU), atmega168)
+AVRDUDE_PARTNO := m168
+endif
+
+ifeq ($(TARGET_MCU), atmega168a)
+AVRDUDE_PARTNO := m168
+endif
+
+ifeq ($(TARGET_MCU), atmega168p)
+AVRDUDE_PARTNO := m168p
+endif
+
+ifeq ($(TARGET_MCU), atmega168pa)
+AVRDUDE_PARTNO := m168p
+endif
+
+ifeq ($(TARGET_MCU), atmega8)
+AVRDUDE_PARTNO := m8
+endif
+
+ifeq ($(TARGET_MCU), atmega16)
+AVRDUDE_PARTNO := m16
+endif
+
+ifeq ($(TARGET_MCU), atmega16a)
+AVRDUDE_PARTNO := m16
+endif
+
+ifeq ($(TARGET_MCU), atmega161)
+AVRDUDE_PARTNO := m161
+endif
+
+ifeq ($(TARGET_MCU), atmega162)
+AVRDUDE_PARTNO := m162
+endif
+
+ifeq ($(TARGET_MCU), atmega163)
+AVRDUDE_PARTNO := m163
+endif
+
+ifeq ($(TARGET_MCU), atmega164a)
+AVRDUDE_PARTNO := m164
+endif
+
+ifeq ($(TARGET_MCU), atmega164p)
+AVRDUDE_PARTNO := m164p
+endif
+
+ifeq ($(TARGET_MCU), atmega165)
+AVRDUDE_PARTNO := m165
+endif
+
+ifeq ($(TARGET_MCU), atmega165a)
+AVRDUDE_PARTNO := m165
+endif
+
+ifeq ($(TARGET_MCU), atmega165p)
+AVRDUDE_PARTNO := m165p
+endif
+
+ifeq ($(TARGET_MCU), atmega169)
+AVRDUDE_PARTNO := m169
+endif
+
+ifeq ($(TARGET_MCU), atmega169a)
+AVRDUDE_PARTNO := m169
+endif
+
+ifeq ($(TARGET_MCU), atmega169p)
+AVRDUDE_PARTNO := m169p
+endif
+
+ifeq ($(TARGET_MCU), atmega169pa)
+AVRDUDE_PARTNO := m169p
+endif
+
+ifeq ($(TARGET_MCU), atmega16hva)
+AVRDUDE_PARTNO := m16hva
+endif
+
+ifeq ($(TARGET_MCU), atmega16hvb)
+AVRDUDE_PARTNO := m16hvb
+endif
+
+ifeq ($(TARGET_MCU), atmega32)
+AVRDUDE_PARTNO := m32
+endif
+
+ifeq ($(TARGET_MCU), atmega323)
+AVRDUDE_PARTNO := m323
+endif
+
+ifeq ($(TARGET_MCU), atmega324a)
+AVRDUDE_PARTNO := m324
+endif
+
+ifeq ($(TARGET_MCU), atmega324p)
+AVRDUDE_PARTNO := m324p
+endif
+
+ifeq ($(TARGET_MCU), atmega324pa)
+AVRDUDE_PARTNO := m324p
+endif
+
+ifeq ($(TARGET_MCU), atmega325)
+AVRDUDE_PARTNO := m325
+endif
+
+ifeq ($(TARGET_MCU), atmega325p)
+AVRDUDE_PARTNO := m325p
+endif
+
+ifeq ($(TARGET_MCU), atmega3250)
+AVRDUDE_PARTNO := m3250
+endif
+
+ifeq ($(TARGET_MCU), atmega3250p)
+AVRDUDE_PARTNO := m3250p
+endif
+
+ifeq ($(TARGET_MCU), atmega328)
+AVRDUDE_PARTNO := m328
+endif
+
+ifeq ($(TARGET_MCU), atmega328p)
+AVRDUDE_PARTNO := m328p
+endif
+
+ifeq ($(TARGET_MCU), atmega329)
+AVRDUDE_PARTNO := m329
+endif
+
+ifeq ($(TARGET_MCU), atmega329p)
+AVRDUDE_PARTNO := m329p
+endif
+
+ifeq ($(TARGET_MCU), atmega329pa)
+AVRDUDE_PARTNO := m329p
+endif
+
+ifeq ($(TARGET_MCU), atmega3290)
+AVRDUDE_PARTNO := m3290
+endif
+
+ifeq ($(TARGET_MCU), atmega3290p)
+AVRDUDE_PARTNO := m3290p
+endif
+
+ifeq ($(TARGET_MCU), atmega32hvb)
+AVRDUDE_PARTNO := m32hvb
+endif
+
+ifeq ($(TARGET_MCU), atmega406)
+AVRDUDE_PARTNO := m406
+endif
+
+ifeq ($(TARGET_MCU), atmega64)
+AVRDUDE_PARTNO := m64
+endif
+
+ifeq ($(TARGET_MCU), atmega640)
+AVRDUDE_PARTNO := m640
+endif
+
+ifeq ($(TARGET_MCU), atmega644)
+AVRDUDE_PARTNO := m644
+endif
+
+ifeq ($(TARGET_MCU), atmega644a)
+AVRDUDE_PARTNO := m644
+endif
+
+ifeq ($(TARGET_MCU), atmega644p)
+AVRDUDE_PARTNO := m644p
+endif
+
+ifeq ($(TARGET_MCU), atmega644pa)
+AVRDUDE_PARTNO := m644p
+endif
+
+ifeq ($(TARGET_MCU), atmega645)
+AVRDUDE_PARTNO := m645
+endif
+
+ifeq ($(TARGET_MCU), atmega645a)
+AVRDUDE_PARTNO := m645
+endif
+
+ifeq ($(TARGET_MCU), atmega645p)
+AVRDUDE_PARTNO := m645p
+endif
+
+ifeq ($(TARGET_MCU), atmega649)
+AVRDUDE_PARTNO := m649
+endif
+
+ifeq ($(TARGET_MCU), atmega649a)
+AVRDUDE_PARTNO := m649
+endif
+
+ifeq ($(TARGET_MCU), atmega649p)
+AVRDUDE_PARTNO := m649p
+endif
+
+ifeq ($(TARGET_MCU), atmega6450)
+AVRDUDE_PARTNO := m6450
+endif
+
+ifeq ($(TARGET_MCU), atmega6450a)
+AVRDUDE_PARTNO := m6450
+endif
+
+ifeq ($(TARGET_MCU), atmega6450p)
+AVRDUDE_PARTNO := m6450p
+endif
+
+ifeq ($(TARGET_MCU), atmega6490)
+AVRDUDE_PARTNO := m6490
+endif
+
+ifeq ($(TARGET_MCU), atmega6490a)
+AVRDUDE_PARTNO := m6490
+endif
+
+ifeq ($(TARGET_MCU), atmega6490p)
+AVRDUDE_PARTNO := m6490p
+endif
+
+ifeq ($(TARGET_MCU), atmega64hve)
+AVRDUDE_PARTNO := m64hve
+endif
+
+ifeq ($(TARGET_MCU), atmega16hva)
+AVRDUDE_PARTNO := m16hva
+endif
+
+ifeq ($(TARGET_MCU), atmega16hva2)
+AVRDUDE_PARTNO := m16hva2
+endif
+
+ifeq ($(TARGET_MCU), atmega16m1)
+AVRDUDE_PARTNO := m16m1
+endif
+
+ifeq ($(TARGET_MCU), atmega16u4)
+AVRDUDE_PARTNO := m16u4
+endif
+
+ifeq ($(TARGET_MCU), atmega32c1)
+AVRDUDE_PARTNO := m32c1
+endif
+
+ifeq ($(TARGET_MCU), atmega32m1)
+AVRDUDE_PARTNO := m32m1
+endif
+
+ifeq ($(TARGET_MCU), atmega32u4)
+AVRDUDE_PARTNO := m32u4
+endif
+
+ifeq ($(TARGET_MCU), atmega32u6)
+AVRDUDE_PARTNO := m32u6
+endif
+
+ifeq ($(TARGET_MCU), atmega64c1)
+AVRDUDE_PARTNO := m64c1
+endif
+
+ifeq ($(TARGET_MCU), atmega64m1)
+AVRDUDE_PARTNO := m64m1
+endif
+
+ifeq ($(TARGET_MCU), atmega128)
+AVRDUDE_PARTNO := m128
+endif
+
+ifeq ($(TARGET_MCU), atmega1280)
+AVRDUDE_PARTNO := m1280
+endif
+
+ifeq ($(TARGET_MCU), atmega1281)
+AVRDUDE_PARTNO := m1281
+endif
+
+ifeq ($(TARGET_MCU), atmega1284p)
+AVRDUDE_PARTNO := m1284p
+endif
+
+ifeq ($(TARGET_MCU), atmega128rfa1)
+AVRDUDE_PARTNO := m128rfa1
+endif
+
+ifeq ($(TARGET_MCU), atmega8515)
+AVRDUDE_PARTNO := m8515
+endif
+
+ifeq ($(TARGET_MCU), atmega8535)
+AVRDUDE_PARTNO := m8535
+endif
+
+ifeq ($(TARGET_MCU), atmega8hva)
+AVRDUDE_PARTNO := m8hva
+endif
+
+ifeq ($(TARGET_MCU), atmega4hvd)
+AVRDUDE_PARTNO := m4hvd
+endif
+
+ifeq ($(TARGET_MCU), atmega8hvd)
+AVRDUDE_PARTNO := m8hvd
+endif
+
+ifeq ($(TARGET_MCU), atmega103)
+AVRDUDE_PARTNO := m103
+endif
+
+ifeq ($(TARGET_MCU), atmega2560)
+AVRDUDE_PARTNO := m2560
+endif
+
+ifeq ($(TARGET_MCU), atmega2561)
+AVRDUDE_PARTNO := m2561
+endif
+
+ifeq ($(TARGET_MCU), atxmega16a4)
+AVRDUDE_PARTNO := x16a4
+endif
+
+ifeq ($(TARGET_MCU), atxmega16d4)
+AVRDUDE_PARTNO := x16d4
+endif
+
+ifeq ($(TARGET_MCU), atxmega32a4)
+AVRDUDE_PARTNO := x32a4
+endif
+
+ifeq ($(TARGET_MCU), atxmega32d4)
+AVRDUDE_PARTNO := x32d4
+endif
+
+ifeq ($(TARGET_MCU), atxmega64a1)
+AVRDUDE_PARTNO := x64a1
+endif
+
+ifeq ($(TARGET_MCU), atxmega64a3)
+AVRDUDE_PARTNO := x64a3
+endif
+
+ifeq ($(TARGET_MCU), atxmega64a4)
+AVRDUDE_PARTNO := x64a4
+endif
+
+ifeq ($(TARGET_MCU), atxmega64d3)
+AVRDUDE_PARTNO := x64d3
+endif
+
+ifeq ($(TARGET_MCU), atxmega128a1)
+AVRDUDE_PARTNO := x128a1
+endif
+
+ifeq ($(TARGET_MCU), atxmega128a1r)
+AVRDUDE_PARTNO := x128a1d
+endif
+
+ifeq ($(TARGET_MCU), atxmega128a3)
+AVRDUDE_PARTNO := x128a3
+endif
+
+ifeq ($(TARGET_MCU), atxmega128a4)
+AVRDUDE_PARTNO := x128a4
+endif
+
+ifeq ($(TARGET_MCU), atxmega128d3)
+AVRDUDE_PARTNO := x128d3
+endif
+
+ifeq ($(TARGET_MCU), atxmega192a1)
+AVRDUDE_PARTNO := x192a1
+endif
+
+ifeq ($(TARGET_MCU), atxmega192a3)
+AVRDUDE_PARTNO := x192a3
+endif
+
+ifeq ($(TARGET_MCU), atxmega192d3)
+AVRDUDE_PARTNO := x192d3
+endif
+
+ifeq ($(TARGET_MCU), atxmega256a1)
+AVRDUDE_PARTNO := x256a1
+endif
+
+ifeq ($(TARGET_MCU), atxmega256a3)
+AVRDUDE_PARTNO := x256a3
+endif
+
+ifeq ($(TARGET_MCU), atxmega256a3b)
+AVRDUDE_PARTNO := x256a3b
+endif
+
+ifeq ($(TARGET_MCU), atxmega256d3)
+AVRDUDE_PARTNO := x256d3
+endif
+
+ifeq ($(TARGET_MCU), at90s1200)
+AVRDUDE_PARTNO := 1200
+endif
+
+ifeq ($(TARGET_MCU), at90s2313)
+AVRDUDE_PARTNO := 2313
+endif
+
+ifeq ($(TARGET_MCU), at90s2323)
+AVRDUDE_PARTNO := 2343
+endif
+
+ifeq ($(TARGET_MCU), at90s2333)
+AVRDUDE_PARTNO := 2333
+endif
+
+ifeq ($(TARGET_MCU), at90s2343)
+AVRDUDE_PARTNO := 2343
+endif
+
+ifeq ($(TARGET_MCU), at90s4414)
+AVRDUDE_PARTNO := 4414
+endif
+
+ifeq ($(TARGET_MCU), at90s4433)
+AVRDUDE_PARTNO := 4433
+endif
+
+ifeq ($(TARGET_MCU), at90s4434)
+AVRDUDE_PARTNO := 4434
+endif
+
+ifeq ($(TARGET_MCU), at90s8515)
+AVRDUDE_PARTNO := 8515
+endif
+
+ifeq ($(TARGET_MCU), at90c8534)
+AVRDUDE_PARTNO := 8534
+endif
+
+ifeq ($(TARGET_MCU), at90s8535)
+AVRDUDE_PARTNO := 8535
+endif
+
+ifeq ($(TARGET_MCU), at90usb82)
+AVRDUDE_PARTNO := usb82
+endif
+
+ifeq ($(TARGET_MCU), at90usb162)
+AVRDUDE_PARTNO := usb162
+endif
+
+ifeq ($(TARGET_MCU), at90pwm1)
+AVRDUDE_PARTNO := pwm1
+endif
+
+ifeq ($(TARGET_MCU), at90pwm2)
+AVRDUDE_PARTNO := pwm2
+endif
+
+ifeq ($(TARGET_MCU), at90pwm2b)
+AVRDUDE_PARTNO := pwm2b
+endif
+
+ifeq ($(TARGET_MCU), at90pwm3)
+AVRDUDE_PARTNO := pwm3
+endif
+
+ifeq ($(TARGET_MCU), at90pwm3b)
+AVRDUDE_PARTNO := pwm3b
+endif
+
+ifeq ($(TARGET_MCU), at90pwm81)
+AVRDUDE_PARTNO := pwm81
+endif
+
+ifeq ($(TARGET_MCU), at90pwm216)
+AVRDUDE_PARTNO := pwm216
+endif
+
+ifeq ($(TARGET_MCU), at90pwm316)
+AVRDUDE_PARTNO := pwm316
+endif
+
+ifeq ($(TARGET_MCU), at90can32)
+AVRDUDE_PARTNO := c32
+endif
+
+ifeq ($(TARGET_MCU), at90can64)
+AVRDUDE_PARTNO := c64
+endif
+
+ifeq ($(TARGET_MCU), at90can128)
+AVRDUDE_PARTNO := c128
+endif
+
+ifeq ($(TARGET_MCU), at90usb646)
+AVRDUDE_PARTNO := usb646
+endif
+
+ifeq ($(TARGET_MCU), at90usb647)
+AVRDUDE_PARTNO := usb647
+endif
+
+ifeq ($(TARGET_MCU), at90usb1286)
+AVRDUDE_PARTNO := usb1286
+endif
+
+ifeq ($(TARGET_MCU), at90usb1287)
+AVRDUDE_PARTNO := usb1287
+endif
+
+ifeq ($(TARGET_MCU), at90scr100)
+AVRDUDE_PARTNO := scr100
+endif
+
+
+################################################################
+## AVRDUDE flags
+################################################################
+
+ifneq ( ,$(PROGRAMMER_PORT))
+AVRDUDE_PORT_FLAG := -P $(PROGRAMMER_PORT)
+else
+AVRDUDE_PORT_FLAG :=
+endif
+
+AVRDUDE_FLAGS := -p $(AVRDUDE_PARTNO)
+AVRDUDE_FLAGS += -c $(PROGRAMMER_ID)
+AVRDUDE_FLAGS += $(AVRDUDE_PORT_FLAG)

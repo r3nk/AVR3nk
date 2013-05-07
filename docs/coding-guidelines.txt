@@ -1,0 +1,201 @@
+================================================================================
+AVR3nk Coding Guidelines
+Author: Robin Klose
+Copyright: (C) 2009-2013 Robin Klose
+This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
+================================================================================
+
+==============================
+1) File Naming
+==============================
+
+File names must express the functionality of their modules. For instance, a
+driver for the UART interface will (at least) have the files uart.c and uart.h
+in its source directory. In the header file, all public functions and datatypes
+must be declared. If there are functions or variables that are commonly used by
+more than one C-file in the package but that should not be visible to the public,
+it is recommended to declare these ones inside a separate private header file
+(e.g., uart_private.h).
+
+==============================
+2) Function Naming
+==============================
+
+Generally one should consider which functions will be part of the API of a
+package and which ones will be used for local purposes only.
+
+Public functions always have the name of their package as prefix in capitalized
+letters followed by a subscore. The functionality is denoted in camel case:
+DRIVER_ThisPartShouldBeAShortDescriptionOfTheFunctionality
+
+For instance, the name of a function that sets up the baud rate of the UART 
+interface looks like this:
+int8_t UART_SetBaudRate(UART_BaudT baudRate);
+
+UART_BaudT is a defined data type that is publicly visible.
+For its naming guidelines, see "Type Definitions" below. 
+
+Private functions are declared with the keyword static. In order to make them
+distinguishable from public functions, they must have the package name as a 
+prefix in lower case letters, directly followed by the function description 
+in camel case:
+driverThisIsAShortDescriptionOfTheFunctionality
+
+For instance, the declaration of a private function that searches a command
+from a passed string in the cmdl ("commandline") library looks like this:
+static cmdlCommandT* cmdlFindCommand(char* cmdNamePtr);
+
+Note that no subscore is inserted between cmdl and FindCommand here.
+Also note that cmdlCommandT is a defined data type that is visible only locally.
+For details, see the description on type definitions below. 
+
+==============================
+3) Variable Naming
+==============================
+
+Global variables: Variables which should be publicly visible must be declared 
+in the corresponding public header file with the keyword 'extern'.
+Global variables are defined in only one C-file in the package.
+They are prefixed with the package name in capital letters followed by a
+subscore followed by a brief description of the variable in camel notation:
+DRIVER_ThisIsAPublicVariable
+
+For instance, a 32-bit wide variable in a module called 'foo' that keeps track
+of the current state could be declared like this:
+
+In foo.h:
+extern uint32_t FOO_State;
+
+In foo.c:
+uint32_t FOO_State = 0;
+
+
+Static global variables: Variables that are declared as static in the top
+level of a C-file (i.e., outside of any procedures) are visible from any
+place within the C-file but they stay invisible for other C-files.
+They are prefixed with the package name in lower case letters followed by
+their description in camel notation:
+driverThisIsAStaticGlobalVariable
+
+For instance, an 8-bit wide variable in a module called "foo" that holds
+a numeric value that is only used within foo.c would be defined like this:
+static uint8_t fooNumericValue = 0;
+
+
+Automatic variables: Variables that are declared within functions are called
+automatic variables. In order to distinguish automatic variables from
+static global variables, words within their name are separated by subscores
+and start with lower case letters. They are not prefixed:
+this_is_an_automatic_variable
+
+For instance, an array containing 11 16-bit values would be defined like this:
+uint16_t naming_demo_arr[11];
+
+
+Static local variables: Variables that are defined within functions and which 
+are declared as static are called static local variables. They keep their 
+values across function calls. Static local variables should be prefixed with 
+the package name, followed by a subscore. The rest of their naming convention
+is identical to automatic variables:
+driver_this_is_a_static_variable
+
+For instance, a counter variable that counts how often a procedure foo in bar.c
+has been called could look like this:
+static uint32_t bar_foo_count = 0;
+
+
+Pointer variables have a ptr suffix (or even more of them if they reference
+other pointers) in their name. Examples:
+
+Global variable pointer in foo.h:
+extern uint8_t* FOO_GlobalStatePtr;
+
+Static global variable pointer pointer in foo.c:
+static uint8_t** fooGlobalStatePtrPtr = NULL;
+
+Temporary automatic void pointer:
+uint8_t* temp_ptr;
+
+
+For arrays and strings, it is recommended to use an "arr" or "array"
+and a "str" or "string" suffix. However, as arrays and strings are handled 
+similarly to pointers in many respects, they may also be suffixed by "ptr".
+
+
+Global array declared in foo.h:
+extern uint16_t FOO_BufferArr[12];
+
+The same variable in foo.c:
+uint16_t FOO_BufferPtr[12];
+
+Static global string in foo.c:
+static char* fooDescriptionStr = "The value of this string is a pointer to the first character.\n"
+
+Array of pointers as an automatic variable:
+
+void* adress_field_ptr_arr[8]; // this is an array of 8 void pointers
+
+==============================
+4) Variable Location
+==============================
+
+All automatic and static variables that are used within a procedure must be
+defined at the very beginning of the procedure.
+
+==============================
+5) Type Definitions
+==============================
+
+Type definitions should be marked with a 'T' suffix.  Globally visible data
+types are prefixed with their package name in capital letters followed by a
+subscore. Locally visible data types are prefixed with their package name in
+lower case letters.
+
+Examples:
+
+A public datatype declared in foo.h:
+
+typedef struct
+{
+    uint8_t someValue;
+    char*   charPtr;
+} FOO_SomeStructT;
+
+A private datatype in foo.c:
+
+typedef enum
+{
+    modeLoud = 0,
+    modeMedium,
+    modeSilent
+} fooLoudnessT;
+
+
+==============================
+6) Documentation
+==============================
+
+Each file, procedure, data type, variable and macro should feature a description
+if this might support others reading the code. Documenting comments should apply 
+doxygen syntax: see www.doxygen.org
+A doxygen comment is introduced like a normal comment, followed by an exclamation 
+mark (!).
+
+Here is an example of a procedure documentation:
+
+/*!
+*******************************************************************************
+** \brief   Write a short description here.
+**
+**          You may write a more detailed description here.
+**
+** \attention
+**          Point out something important if necessary. 
+**
+** \param   paramName1  Describe the first parameter of the procedure.
+** \param   paramName2  Describe the second parameter of the procedure.
+**
+** \return  Describe the final return value.
+**
+*******************************************************************************
+*/

@@ -1,0 +1,44 @@
+################################################################
+##
+## General and environment dependent make variables.
+##
+## Copyright (C) 2009-2013 Robin Klose
+##
+## This file is part of AVR3nk, available at 
+## https://github.com/r3nk/AVR3nk
+##
+################################################################
+
+################################################################
+## Make specific variables
+################################################################
+
+include $(TOPDIR)/env/make/Make.var.make
+
+################################################################
+## Environment specific program paths and variables
+################################################################
+
+include $(TOPDIR)/env/make/Make.var.$(OS_CLASS)
+
+################################################################
+## Flags
+################################################################
+
+include $(TOPDIR)/env/make/Make.var.flags
+
+################################################################
+# MCU device list and avrdude's equivalents
+################################################################
+
+include $(TOPDIR)/env/make/Make.var.avrdude
+
+################################################################
+## Checks
+################################################################
+
+ifneq (,$(MCU))
+ifeq (,$(findstring $(TARGET_MCU:%='%'),$(MCU:%='%')))
+$(error $(TARGET_MCU) is not a supported device in [$(SUBDIR)])
+endif
+endif

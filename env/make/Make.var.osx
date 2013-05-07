@@ -1,0 +1,44 @@
+################################################################
+##
+## OS X toolchain variables.
+##
+## Copyright (C) 2009-2013 Robin Klose
+##
+## This file is part of AVR3nk, available at 
+## https://github.com/r3nk/AVR3nk
+##
+################################################################
+
+################################################################
+## STANDARD UTILITIES
+################################################################
+
+ECHO := echo
+
+MKDIR := mkdir
+MKDIR_P := mkdir -p
+
+ifeq ($(VERBOSE),0)
+RM := rm
+RM_F := rm -f
+RM_RF := rm -r -f
+else
+RM := rm -v
+RM_F := rm -f -v
+RM_RF := rm -r -f -v
+endif
+
+CP := cp
+CD := cd
+
+################################################################
+## AVR-GCC, BINUTILS and friends
+################################################################
+
+CC := avr-gcc
+AR := avr-ar
+LD := avr-ld
+OBJCPY := avr-objcopy
+OBJDUMP := avr-objdump
+SIZE := avr-size
+AVRDUDE := avrdude

@@ -1,0 +1,63 @@
+################################################################################
+##
+## This file contains default configuration options for the environment. 
+## User specific configuration files are named config.mak.user, 
+## where 'user' is the value returned by echo %username% on a windows 
+## command line or echo $username on a linux shell without any whitespaces.
+##
+## Each configuration setting should be accomplished by a ?= assignment, 
+## so that options can be overridden on the command line. 
+##
+## Copyright (C) 2009-2013 Robin Klose
+##
+## This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
+##
+################################################################################
+
+################################################################################
+## Set the verbosity level of the build system for reporting messages.
+## 0: Only standard messages are reported.  [default]
+## 1: Some report messages of invoked programs are printed.
+## 2: In addition, all commands calls that are invoked by Make are printed.
+################################################################################
+
+VERBOSE ?= 1
+
+################################################################################
+## Compiler flag passed by the user.
+## User flags override default compiler flags.
+## Compiler options are listed in the GCC documentation at:
+## http://gcc.gnu.org/onlinedocs
+##
+## In order to set up the optimization level, add one of the
+## following options to CFLAGS_USER:
+## -Os : space optimization [default]
+## -O0 : unoptimized code (recommended for debugging)
+## -O1 : speed optimization
+## -O2 : more speed optimization
+## -O3 : even more speed optimization, may result in large code!
+################################################################################
+
+CFLAGS_USER ?= -Os
+
+################################################################################
+## Path to the WinAVR package containing the compiler and binary utilities.
+## This variable must be set on Windows machines.
+################################################################################
+
+WINAVR ?= 
+
+################################################################################
+## AVRDUDE settings
+##
+## - PROGRAMMER_ID:   Specifies the programmer. Type "avrdude -c ?"
+##                    in order to display a list of supported programmers.
+## - PROGRAMMER_PORT: Identifies the device to which the programmer is attached.
+##                    http://www.nongnu.org/avrdude/user-manual/avrdude_4.html
+##
+################################################################################
+
+PROGRAMMER_ID          ?= avrisp2
+PROGRAMMER_PORT        ?= /dev/tty.SLAB_USBtoUART
+AVRDUDE_USER_FLAGS     ?= -y
+AVRDUDE_EW_CYCLE_COUNT ?= 0

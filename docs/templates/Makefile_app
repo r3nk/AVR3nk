@@ -1,0 +1,90 @@
+################################################################
+##
+## Mandatory settings for an APPLICATION:
+## - APPLICATION
+## - TOPDIR
+## - SUBDIR
+## - SOURCES
+## - HEADERS
+## - LIBRARIES
+## - DEPBUILD_ITERATIVE_LIBRARIES
+## - DEPBUILD_RECURSIVE_LIBRARIES
+## - MCU
+##
+## NOTE: LIBRARIES, DEPBUILD_ITERATIVE_LIBRARIES, and 
+##       DEPBUILD_RECURSIVE_LIBRARIES must be disjunctive, i.e.,
+##       they must not include duplicate software modules! 
+##
+## Available Make targets: 
+## all [default], clean, build, size, program
+##
+## Copyright (C) <year> <author>
+##
+## This file is part of AVR3nk, available at 
+## https://github.com/r3nk/AVR3nk
+##
+################################################################
+
+APPLICATION = < application name >
+
+################################################################
+## Directory Settings
+################################################################
+
+TOPDIR := < relative path to top directory >
+SUBDIR := < relative path from top directory to this directory >
+
+################################################################
+## Sources
+################################################################
+
+SOURCES := src/main.c
+
+################################################################
+## Module Configuration
+################################################################
+
+APP_MACROS := F_CPU=18432000
+APP_MACROS += < List of macros that will be made available to
+                the source code through the compiler. They are
+                intended to be used to configure software modules
+                (e.g., pin-outs of drivers) depending on the 
+                actual application. >
+
+################################################################
+## Pre-built Libraries
+################################################################
+
+#LIBRARIES := buffer
+#LIBRARIES += uart
+#LIBRARIES += cmdl
+#LIBRARIES += < List of pre-built libraries that will be linked
+                to the application. Note that pre-built 
+                libraries do not allow for individual 
+                configuration by means of APP_MACROS. >
+
+################################################################
+## Dependency Builds
+################################################################
+
+# Either specify DEPBUILDS_ITERATIVE or DEPBUILDS_RECURSIVE: 
+
+# Specify all dependencies in the correct build order: 
+#DEPBUILDS_ITERATIVE := drivers/buffer
+#DEPBUILDS_ITERATIVE += drivers/uart
+#DEPBUILDS_ITERATIVE += subsystems/cmdl
+
+# Specify the latest dependency to build dependencies recursively: 
+#DEPBUILDS_RECURSIVE := subsystems/cmdl
+
+################################################################
+## Target MCU(s) (first MCU in list is used for programming)
+################################################################
+
+MCU := atmega644p
+
+################################################################
+## Load Configuration
+################################################################
+
+include $(TOPDIR)/env/make/Make.conf
