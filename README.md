@@ -11,7 +11,7 @@ Typically, the software running on a microcontroller has project-specific requir
 
 AVR3nk's build environment allows to organize libraries in a single place. Static parameters (i.e., parameters which do not change at runtime) are defined as macros in the libraries' header files and can be overridden through individual build settings of applications. Furthermore, AVR3nk's build environment allows to declare libraries to be capable of handling various kinds of MCUs. This allows to reuse the same library code in different projects which target different AVR devices. 
 
-The build environment is based on [Make]("http://en.wikipedia.org/wiki/Make_(software)") and is controlled via terminal. However, you do not have to write complicated makefiles to get your projects working. In order to build a new library or application, you only have to provide a makefile with some basic information, such as source and header files and the project's location in the directory tree. Lastly, a custom makefile must include the build environment (a one-liner) to provide the full power of cross-directory builds, recursive builds, device programming, and so on. 
+The build environment is based on [Make][make] and is controlled via terminal. However, you do not have to write complicated makefiles to get your projects working. In order to build a new library or application, you only have to provide a makefile with some basic information, such as source and header files and the project's location in the directory tree. Lastly, a custom makefile must include the build environment (a one-liner) to provide the full power of cross-directory builds, recursive builds, device programming, and so on. 
 
 
 Setup
@@ -79,13 +79,13 @@ Furthermore, each makefile contains the following line to include the build envi
 
 Basically, there are three different kinds of makefiles in the directory structure: directory, library, and application. 
 
-**Directory**: A directory makefile manages subdirectories but does not directly manage compilable resources. Besides TOPDIR and SUBDIR, it declares the DIRECTORIES variable, which may hold the names of various subdirectories of the makefile's directory. On recursive builds, Make will automatically perform its build target(s) within each of the directories listed in DIRECTORIES. For instance, when calling 'make build' in the drivers directory, 'make build' will be executed for each of the drivers. <br/>
+**Directory**: A directory makefile manages subdirectories but does not directly manage compilable resources. Besides TOPDIR and SUBDIR, it declares the DIRECTORIES variable, which may hold the names of various subdirectories of the makefile's directory. On recursive builds, Make will automatically perform its build target(s) within each of the directories listed in DIRECTORIES. For instance, when executing *make build* in the drivers directory, *make build* will be executed for each of the drivers. <br/>
 You can execute the following make targets for a directory: *clean*, *headers*, *build*, *install*, *all* (all is the default, and typically expands to: *clean build install*).
 
 **Library**: A library contains a collection of software modules which accomplish a specific purpose without being bound to a particular application. In AVR3nk, the drivers and the subsystems directories contain libraries. A library's makefile declares the variables LIBRARY, TOPDIR, SUBDIR, SOURCES, HEADERS, DEPENDENCIES, and MCU. <br/>
-LIBRARY declares the library's name, which should start with a lib prefix by convenience. It defines the name of the pre-compiled library archive which is copied to the install directory when the 'install' target is invoked. <br/>
+LIBRARY declares the library's name, which should start with a lib prefix by convenience. It defines the name of the pre-compiled library archive which is copied to the install directory when the *install* target is invoked. <br/>
 SOURCES contains the names of all source files of the library. <br/>
-The HEADERS variable holds all public headers of the library, i.e., headers that should be includable by other modules. These headers are copied to the install directory when the 'headers' target is invoked. <br/>
+The HEADERS variable holds all public headers of the library, i.e., headers that should be includable by other modules. These headers are copied to the install directory when the *headers* target is invoked. <br/>
 The DEPENDENCIES variable declares dependencies on other libraries and contains the paths from the AVR3nk's top directory to the directories of these libraries. It is required when building application dependencies recursively (see below). The MCU variable declares all MCUs that are supported by that library. If MCUs differ in register configuration, these differences must be taken into account for all supported MCUs, e.g., by macro switches in the source code. <br/>
 You can execute the following make targets for a library: *clean*, *headers*, *build*, *install*, *all* (default).
 
@@ -111,3 +111,6 @@ Contributing
 If you like to contribute to AVR3nk, feel free to contact me. I'm willing to add further libraries.
 
 So far, I've mainly tested the libraries on atmega644p, atmega644 and atmega16 devices. Adding support for other devices is easy, but I won't buy all the different microcontrollers just to test my code. So if you have successfully patched one or several libraries for other AVR devices, drop me a line. 
+
+
+[make]: http://en.wikipedia.org/wiki/Make_(software)
