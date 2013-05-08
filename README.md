@@ -1,7 +1,7 @@
 AVR3nk
 ================
 
-AVR3nk is a cross-platform build environment and a library collection for 8-bit AVR microcontrollers. It allows to maintain libraries and applications for different kinds of 8-bit AVR microcontrollers and is especially useful for team development. You can use AVR3nk on Linux, Mac OS X, and Windows. AVR3nk includes an interrupt-driven and buffered driver for dual UART operation, a commandline interface (e.g., for interactive module testing), as well as an interrupt-driven driver for the MCP2515 CAN controller, which interfaces via SPI. 
+AVR3nk is a cross-platform build environment and a library collection for 8-bit AVR microcontrollers. It allows to maintain libraries and applications for different kinds of 8-bit AVR microcontrollers and is especially useful for team development. You can use AVR3nk on Linux, Mac OS X, and Windows. AVR3nk includes an interrupt-driven and buffered driver for dual UART operation, a commandline interface (e.g., for interactive module testing), as well as an interrupt-driven driver for the MCP2515 [CAN](http://en.wikipedia.org/wiki/CAN_bus) controller, which interfaces via [SPI](http://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus). 
 
 
 Motivation
@@ -16,6 +16,7 @@ The build environment is based on [Make][make] and is controlled via terminal. H
 
 Setup
 ----------------
+
 You must install the following packages in order to use AVR3nk: 
 * avr-gcc
 * avr-libc
@@ -28,12 +29,13 @@ You must install the following packages in order to use AVR3nk:
 
 **Windows**: Download and install [WinAVR](http://winavr.sourceforge.net). 
 
-Once you've downloaded AVR3nk, you have to create a custom configuration file in *env/config*. This file is going to hold your user specific configuration, such as the location of your WinAVR installation (if you are on Windows) and your programming hardware settings. You should use *config.mak* as a template and name your personal file *config.mak.&lt;yourLoginName&gt;*. The template provides further instructions on each setting. Note that you have to remove any whitespaces in &lt;yourLoginName&gt;. E.g., if my login name was *Robin Klose*, my configuration file would be named *config.mak.RobinKlose*. The build environment automatically reads your personal configuration whenever you invoke any Make targets. You can also keep the configuration files of your team members under revision control and change them centrally if global changes need to be applied. 
+Once you've downloaded AVR3nk, you have to create a custom configuration file in *env/config*. This file will hold your user specific configuration, such as the location of your WinAVR installation (if you are on Windows) and your programming hardware settings. You should use *config.mak* as a template and name your personal file *config.mak.&lt;yourLoginName&gt;*. The template provides further instructions on each setting. Note that you have to remove any whitespaces in &lt;yourLoginName&gt;. E.g., if my login name was *Robin Klose*, my configuration file would be named *config.mak.RobinKlose*. The build environment automatically reads your personal configuration whenever you invoke any Make targets. You can also keep the configuration files of your team members under revision control and change them centrally if global changes need to be applied. 
 
 
 Directory Structure
 ----------------
-AVR3nk defines a directory structure that can also be extended or adapted to individual needs. The drivers directory contains libraries that access a microcontroller's registers or peripheral hardware. The subsystems directory contains libraries that are stacked on top of other libraries but which do not directly interact with hardware. The applications directory contains software projects related to their corresponding hardware projects, i.e., applications are designed for a particular MCU and incorporate specific pinout settings. Applications can finally be linked to libraries and be programmed to AVR hardware. The env directory contains the build environment and user specific configuration files. The docs directory contains coding guidelines, templates and other documents. There are library templates (library.h and library.c) as well as an application template (main.c). Further, there are makefile templates for directories (Makefile\_dir), libraries (Makefile\_lib) and applications (Makefile\_app). When using one of these templates for a new makefile, the new makefile should just be named *Makefile*. The build environment also creates an install directory for header files and pre-compiled library archives. The build environment adds the install directory to the standard search path of the compiler and the linker in order to find header files and pre-compiled libraries. 
+
+AVR3nk defines a directory structure that can easily be extended or adapted to individual needs. The drivers directory contains libraries that access a microcontroller's registers or peripheral hardware. The subsystems directory contains libraries that are stacked on top of other libraries but which do not directly interact with hardware. The applications directory contains software projects related to their corresponding hardware projects, i.e., applications are designed for a particular MCU and incorporate specific pinout settings. Applications can finally be linked to libraries and be programmed to AVR hardware. The env directory contains the build environment and user specific configuration files. The docs directory contains coding guidelines, templates and other documents. There are library templates (library.h and library.c) as well as an application template (main.c). Further, there are makefile templates for directories (Makefile\_dir), libraries (Makefile\_lib) and applications (Makefile\_app). When using one of these templates for a new makefile, the new makefile should just be named *Makefile*. The build environment also creates an install directory for header files and pre-compiled library archives. The build environment adds the install directory to the standard search path of the compiler and the linker in order to find header files and pre-compiled libraries. 
 
 
 Make Targets
@@ -102,7 +104,7 @@ You can execute the following make targets for an application: *clean*, *build*,
 Background
 ----------------
 
-AVR3nk was initially created in 2009 at the [Sailing Team Darmstadt e.V.](http://www.st-darmstadt.de), a students' association at [Technische Universität Darmstadt](http://www.tu-darmstadt.de). The team aims to build autonomous and energy-self-sufficient sailing robots. The code available in AVR3nk includes the team's basic infrastructure for developing sensor and actuator devices. 
+AVR3nk was initially created in 2009 at the [Sailing Team Darmstadt e.V.](http://www.st-darmstadt.de), a students' association at [Technische Universität Darmstadt](http://www.tu-darmstadt.de). The team aims to build autonomous and energy-self-sufficient sailing robots. AVR3nk contains the team's basic infrastructure for developing sensor and actuator devices. 
 
 
 Contributing
