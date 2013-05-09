@@ -1,7 +1,7 @@
 AVR3nk
 ================
 
-AVR3nk is a cross-platform build environment and a library collection for 8-bit AVR microcontrollers. It allows to maintain libraries and applications for different kinds of 8-bit AVR microcontrollers and is especially useful for team development. You can use AVR3nk on Linux, Mac OS X, and Windows. AVR3nk includes an interrupt-driven and buffered driver for dual UART operation, a commandline interface (e.g., for interactive module testing), as well as an interrupt-driven driver for the MCP2515 [CAN](http://en.wikipedia.org/wiki/CAN_bus) controller, which interfaces via [SPI](http://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus). 
+AVR3nk is a cross-platform build environment and a library collection for [Atmel's 8-bit AVR](http://www.atmel.com/products/microcontrollers/avr/default.aspx) microcontrollers. It allows to maintain libraries and applications for different kinds of 8-bit AVR microcontrollers and is especially useful for team development. AVR3nk can be used on Linux, Mac OS X, and Windows. It includes an interrupt-driven and buffered driver for dual UART operation, a commandline interface (e.g., for interactive module testing), as well as an interrupt-driven driver for the MCP2515 [CAN](http://en.wikipedia.org/wiki/CAN_bus) controller, which interfaces via [SPI](http://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus). 
 
 
 Motivation
@@ -48,7 +48,7 @@ The following Make targets are available:
 * **build**: Compiles the source code. For libraries, it will also create (or update) a library archive if source files were updated. For an application, it will also build library dependencies into the application's build directory and link everything to an executable which can be programmed to AVR hardware. The build command compiles only files that were changed since the last compilation. 
 * **headers**: Copies the header files of a library to the install directory. 
 * **install**: Copies the pre-compiled archive file of a library to the install directory. 
-* **all**: Rebuilds everything anew by invoking the targets *clean*, *build* and *install*. 
+* **all**: Rebuilds everything anew. For libraries, *all* expands to *clean* *headers* *build* *install*. For applications, *all* expands to *clean* *build*. In AVR3nk's top directory, *all* also removes all files in the *install* directory. 
 * **program**: This target is only valid for applications. It invokes avrdude to write the programming file to the AVR microcontroller. 
 * **size**: Displays the size of a program. This target works only for applications. 
 
