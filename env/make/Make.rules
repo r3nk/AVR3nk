@@ -34,7 +34,7 @@ clean: $(DIRECTORIES:%=subdir-clean-%)
 headers: $(DIRECTORIES:%=subdir-headers-%)
 build: $(DIRECTORIES:%=subdir-build-%)
 install: $(DIRECTORIES:%=subdir-install-%)
-all: clean build install
+all: $(DIRECTORIES:%=subdir-all-%)
 program: 
 
 else ifdef LIBRARY
@@ -44,7 +44,7 @@ clean: clean-builddir
 headers: $(MCU:%=mcu-install-headers-%)
 build: $(MCU:%=mcu-build-objects-%) $(MCU:%=mcu-build-library-%)
 install: headers $(MCU:%=mcu-install-library-%)
-all: clean headers install
+all: clean headers build install
 program: 
 
 else ifdef APPLICATION
@@ -93,6 +93,12 @@ subdir-install-%:
 	@$(ECHO) 
 	@$(ECHO) $(PREFIX) Making install in \[$(SUBDIR)/$(@:subdir-install-%=%)\]
 	@$(SUBMAKE) -C $(@:subdir-install-%=%) install
+
+.PHONY: subdir-all-%
+subdir-all-%:
+	@$(ECHO) 
+	@$(ECHO) $(PREFIX) Making all in \[$(SUBDIR)/$(@:subdir-all-%=%)\]
+	@$(SUBMAKE) -C $(@:subdir-all-%=%) all
 
 
 ################################################################
