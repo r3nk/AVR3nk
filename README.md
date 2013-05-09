@@ -48,7 +48,7 @@ The following Make targets are available:
 * **build**: Compiles the source code. For libraries, it will also create (or update) a library archive if source files were updated. For an application, it will also build library dependencies into the application's build directory and link everything to an executable which can be programmed to AVR hardware. The build command compiles only files that were changed since the last compilation. 
 * **headers**: Copies the header files of a library to the install directory. 
 * **install**: Copies the pre-compiled archive file of a library to the install directory. 
-* **all**: Rebuilds everything anew by invoking the targets *clean*, *build* and *install*. 
+* **all**: Rebuilds everything anew. For libraries, it expands to *clean* *headers* *build* *install*, for applications it expands to *clean* *build*. In AVR3nk's top directory, it also removes all files in the *install* directory. 
 * **program**: This target is only valid for applications. It invokes avrdude to write the programming file to the AVR microcontroller. 
 * **size**: Displays the size of a program. This target works only for applications. 
 
