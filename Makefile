@@ -34,7 +34,7 @@ OVERRIDE_DEFAULT_TARGETS = 1
 
 default: all
 
-clean: $(DIRECTORIES:%=subdir-clean-%) clean-install
+clean: clean-install $(DIRECTORIES:%=subdir-clean-%)
 
 headers: $(DIRECTORIES:%=subdir-headers-%)
 
@@ -42,7 +42,7 @@ build: $(DIRECTORIES:%=subdir-build-%)
 
 install: $(DIRECTORIES:%=subdir-install-%)
 
-all: clean headers install
+all: clean-install $(DIRECTORIES:%=subdir-all-%)
 
 
 ################################################################
