@@ -62,12 +62,9 @@ LDDIRS    = -Wl,-L$(INSTALL_LIBRARY_DIR)
 
 LDLIBS    = -Wl,--start-group
 LDLIBS   += $(LIBRARIES:%=-Wl,-l%)
+LDLIBS   += $(IDEPS_LIBRARIES)
+LDLIBS   += $(RDEPS_LIBRARIES)
 LDLIBS   += -Wl,--end-group
-
-LDDEPS    = -Wl,--start-group
-LDDEPS   += $(IDEPS_LIBRARIES)
-LDDEPS   += $(RDEPS_LIBRARIES)
-LDDEPS   += -Wl,--end-group
 
 ################################################################
 ## Object Copy flags for Intel Hex file production

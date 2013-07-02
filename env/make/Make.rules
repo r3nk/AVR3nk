@@ -141,6 +141,10 @@ mcu-install-headers-%:
 mcu-install-library-%:
 	@$(SUBMAKE) TARGET_MCU=$(@:mcu-install-library-%=%) install-library
 
+.PHONY: mcu-install-library-prebuilt-%
+mcu-install-library-prebuilt-%:
+	@$(SUBMAKE) TARGET_MCU=$(@:mcu-install-library-prebuilt-%=%) install-library-prebuilt
+
 
 ################################################################
 ## DEPENDENCIES targets
@@ -280,7 +284,7 @@ $(BUILD_DIR)/%.elf: $(BUILD_OBJECTS) $(IDEPS_LIBRARIES) $(RDEPS_LIBRARIES)
 	@$(ECHO) $(PREFIX) Building ELF file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Linking \[$(BUILD_OBJECTS) $(LIBRARIES) $(IDEPS_LIBRARIES) $(RDEPS_LIBRARIES)\] --\> \[$(BUILD_PROGRAM_ELF)\]
 	$(AT)$(MKDIR_P) $(BUILD_DIR)
-	$(AT)$(CC) $(LDFLAGS) $(LDFLAGS_USER) $(BUILD_OBJECTS) $(LDDIRS) $(LDLIBS) $(LDDEPS) -o $(BUILD_PROGRAM_ELF)
+	$(AT)$(CC) $(LDFLAGS) $(LDFLAGS_USER) $(BUILD_OBJECTS) $(LDDIRS) $(LDLIBS) -o $(BUILD_PROGRAM_ELF)
 
 $(BUILD_DIR)/%.hex: $(BUILD_PROGRAM_ELF)
 	@$(ECHO) 
@@ -330,6 +334,12 @@ $(INSTALL_HEADERS_PKG_DIR)/%.h: */%.h
 	$(AT)$(MKDIR_P) $(INSTALL_HEADERS_PKG_DIR)
 	$(AT)$(CP) $< $@
 
+$(INSTALL_HEADERS_PKG_DIR)/%.h: */*/%.h
+	@$(ECHO) 
+	@$(ECHO) $(PREFIX) Installing header file for MCU \[$(TARGET_MCU)\]
+	@$(ECHO) $(PREFIX) Copying \[$<\] --\> \[$@\]
+	$(AT)$(MKDIR_P) $(INSTALL_HEADERS_PKG_DIR)
+	$(AT)$(CP) $< $@
 
 .PHONY: install-library
 ifeq ($(LIBRARY), )
@@ -338,6 +348,15 @@ install-library:
 	@$(ECHO) $(PREFIX) ERROR: You must specify the LIBRARY variable in your makefile for target \[install-library\]!
 else
 install-library: build-objects $(INSTALL_LIBRARY)
+endif
+
+.PHONY: install-library-prebuilt
+ifeq ($(LIBRARY), )
+install-library-prebuilt:
+	@$(ECHO) 
+	@$(ECHO) $(PREFIX) ERROR: You must specify the LIBRARY variable in your makefile for target \[install-library-prebuilt\]!
+else
+install-library-prebuilt: $(INSTALL_LIBRARY)
 endif
 
 $(INSTALL_LIBRARY_DIR)/%.a: $(BUILD_DIR)/%.a
