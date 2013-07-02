@@ -27,7 +27,7 @@ DIRECTORIES += subsystems
 DIRECTORIES += applications
 
 ################################################################
-## Override the default target in the top directory
+## Override the default targets in the top directory
 ################################################################
 
 OVERRIDE_DEFAULT_TARGETS = 1

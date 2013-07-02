@@ -19,8 +19,8 @@
 ## Directory Settings
 ################################################################
 
-TOPDIR = ..
-SUBDIR = drivers
+TOPDIR := ..
+SUBDIR := drivers
 
 DIRECTORIES := macros
 DIRECTORIES += buffer

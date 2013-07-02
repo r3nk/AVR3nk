@@ -7,8 +7,8 @@
 ## - SOURCES
 ## - HEADERS
 ## - LIBRARIES
-## - DEPBUILD_ITERATIVE_LIBRARIES
-## - DEPBUILD_RECURSIVE_LIBRARIES
+## - DEPBUILDS_ITERATIVE
+## - DEPBUILDS_RECURSIVE
 ## - MCU
 ##
 ## Available Make targets: 
@@ -21,14 +21,14 @@
 ##
 ################################################################
 
-APPLICATION = CAN-inspector
+APPLICATION := CAN-inspector
 
 ################################################################
 ## Directory Settings
 ################################################################
 
-TOPDIR = ../..
-SUBDIR = applications/CAN-inspector
+TOPDIR := ../..
+SUBDIR := applications/CAN-inspector
 
 ################################################################
 ## Sources

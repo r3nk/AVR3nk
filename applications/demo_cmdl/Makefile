@@ -7,8 +7,8 @@
 ## - SOURCES
 ## - HEADERS
 ## - LIBRARIES
-## - DEPBUILD_ITERATIVE_LIBRARIES
-## - DEPBUILD_RECURSIVE_LIBRARIES
+## - DEPBUILDS_ITERATIVE
+## - DEPBUILDS_RECURSIVE
 ## - MCU
 ##
 ## Available Make targets: 
@@ -21,14 +21,14 @@
 ##
 ################################################################
 
-APPLICATION = commandline
+APPLICATION := commandline
 
 ################################################################
 ## Directory Settings
 ################################################################
 
-TOPDIR = ../..
-SUBDIR = applications/demo_cmdl
+TOPDIR := ../..
+SUBDIR := applications/demo_cmdl
 
 ################################################################
 ## Sources

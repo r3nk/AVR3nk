@@ -7,8 +7,8 @@
 ## - SOURCES
 ## - HEADERS
 ## - LIBRARIES
-## - DEPBUILD_ITERATIVE_LIBRARIES
-## - DEPBUILD_RECURSIVE_LIBRARIES
+## - DEPBUILDS_ITERATIVE
+## - DEPBUILDS_RECURSIVE
 ## - MCU
 ##
 ## Available Make targets: 
@@ -21,14 +21,14 @@
 ##
 ################################################################
 
-APPLICATION = demo_sensor
+APPLICATION := demo_sensor
 
 ################################################################
 ## Directory Settings
 ################################################################
 
-TOPDIR = ../..
-SUBDIR = applications/demo_sensor
+TOPDIR := ../..
+SUBDIR := applications/demo_sensor
 
 ################################################################
 ## Sources

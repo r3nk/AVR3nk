@@ -7,13 +7,9 @@
 ## - SOURCES
 ## - HEADERS
 ## - LIBRARIES
-## - DEPBUILD_ITERATIVE_LIBRARIES
-## - DEPBUILD_RECURSIVE_LIBRARIES
+## - DEPBUILDS_ITERATIVE
+## - DEPBUILDS_RECURSIVE
 ## - MCU
-##
-## NOTE: LIBRARIES, DEPBUILD_ITERATIVE_LIBRARIES, and 
-##       DEPBUILD_RECURSIVE_LIBRARIES must be disjunctive, i.e.,
-##       they must not include duplicate software modules! 
 ##
 ## Available Make targets: 
 ## all [default], clean, build, size, program
@@ -25,7 +21,7 @@
 ##
 ################################################################
 
-APPLICATION = < application name >
+APPLICATION := < application name >
 
 ################################################################
 ## Directory Settings
