@@ -17,6 +17,7 @@
 #define CMDL_H
 
 #include <stdint.h>
+#include <drivers/uart.h>
 
 //*****************************************************************************
 //*************************** DEFINES AND MACROS ******************************
@@ -47,21 +48,11 @@
 #define CMDL_USAGE_STRING_SUPPORT       0
 #endif
 
-// Defines the prompt: 
-#ifndef CMDL_PROMPT
 #define CMDL_PROMPT                     "AVR > "
-#endif
 
-// Defines the prefix printed in front of messages by CMDL: 
-#ifndef CMDL_LABEL
 #define CMDL_LABEL                      "[CMDL] "
-#endif
 
-// Defines the prefix printed in front of debug messages by CMDL: 
-#ifndef CMDL_LABEL_DEBUG
 #define CMDL_LABEL_DEBUG                "[CMDL/dbg] "
-#endif
-
 
 //*****************************************************************************
 //************************* CMDL SPECIFIC ERROR CODES *************************
@@ -110,7 +101,7 @@ typedef struct
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-int8_t CMDL_Init (CMDL_OptionsT options);
+int8_t CMDL_Init (UART_HandleT uartHandle, CMDL_OptionsT options);
 int8_t CMDL_IsInitialized (void);
 #if CMDL_USAGE_STRING_SUPPORT
 int8_t CMDL_RegisterCommand (void (*funcPtr) (uint8_t argc, char* argv[]),

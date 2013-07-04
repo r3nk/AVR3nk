@@ -35,9 +35,10 @@ DEPENDENCIES :=
 ## Supported MCUs
 ################################################################
 
-MCU := atmega644
-MCU += atmega644p
+MCU := atmega644p
+MCU += atmega644
 MCU += atmega16
+MCU += atmega8
 
 ################################################################
 ## Targets
