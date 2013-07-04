@@ -5,7 +5,7 @@
 **
 ** \author    Robin Klose
 **
-** Copyright 2009-2013 Robin Klose
+** Copyright (C) 2009-2013 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -15,6 +15,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h> // needed for strtol / strtoul
 #include <avr/interrupt.h>
 #include <drivers/uart.h>
@@ -40,6 +41,7 @@ static void   appPrintFloat(uint8_t argc, char* argv[]);
 //****************************** LOCAL DATA ***********************************
 //*****************************************************************************
 
+static UART_HandleT appUartHandle = NULL;
 static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
 
 //*****************************************************************************
@@ -60,12 +62,12 @@ int main(int argc, char* argv[])
     if(appInit()) return(-1);
     printf("\n\n");
     printf("**********************************************\n");
-    printf(" Demo Application: Command-Line Interface\n");
+    printf(" Demo Application: Command Line Interface\n");
     printf(" Author: Robin Klose\n");
     printf("**********************************************\n");
     CMDL_Run();
     printf("\n\nExiting...\n");
-    UART_TxFlush();
+    UART_TxFlush(appUartHandle);
     return(0);
 }
 
@@ -75,19 +77,32 @@ int main(int argc, char* argv[])
 
 static int8_t appInit(void)
 {
+    UART_LedParamsT led_params;
     CMDL_OptionsT cmdl_options;
     int8_t result;
 
     // initialize UART and STDIO:
-    result = UART_Init (UART_Baud_115200,
-                        UART_Parity_off,
-                        UART_StopBit_1,
-                        UART_CharSize_8,
-                        UART_Transceive_RxTx);
-    if(result != UART_OK)
+    memset(&led_params, 0, sizeof(led_params));
+    led_params.txLedPortPtr = &PORTA;
+    led_params.txLedDdrPtr  = &DDRA;
+    led_params.txLedIdx     = 6;
+    led_params.rxLedPortPtr = &PORTA;
+    led_params.rxLedDdrPtr  = &DDRA;
+    led_params.rxLedIdx     = 7;
+
+    appUartHandle = UART_Init(0,
+                              UART_Baud_230400,
+                              UART_Parity_off,
+                              UART_StopBit_1,
+                              UART_CharSize_8,
+                              UART_Transceive_RxTx,
+                              &led_params);
+    if(appUartHandle == NULL)
     {
         return(-1);
     }
+
+    // assign stdio:
     stdout = &appStdio;
     stdin  = &appStdio;
     sei();
@@ -95,7 +110,7 @@ static int8_t appInit(void)
     // initialze CMDL:
     cmdl_options.flushRxAfterExec = 1;
     cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(cmdl_options);
+    result = CMDL_Init(appUartHandle, cmdl_options);
     if(result != CMDL_OK)
     {
         printf("CMDL could not be initialized: %d\n", result);
@@ -114,13 +129,13 @@ static int8_t appInit(void)
 
 static int appStdioPut(char chr, FILE* streamPtr)
 {
-    UART_TxByte(chr);
+    UART_TxByte(appUartHandle, chr);
     return(0);
 }
 
 static int appStdioGet(FILE* streamPtr)
 {
-    return((int)UART_RxByte());
+    return((int)UART_RxByte(appUartHandle));
 }
 
 static void appList(uint8_t argc, char* argv[])

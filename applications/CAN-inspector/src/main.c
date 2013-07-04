@@ -60,6 +60,7 @@ static void   appCmdListenCAN(uint8_t argc, char* argv[]);
 //**************************** LOCAL VARIABLES ********************************
 //*****************************************************************************
 
+static UART_HandleT appUartHandle = NULL;
 static struct
 {
     uint8_t canInitialized : 1;
@@ -87,17 +88,28 @@ static volatile uint8_t appListenAbort = 0;
 */
 static int8_t appInit(void)
 {
-    UART_CallbackRxOptionsT cb_opts;
+    UART_LedParamsT led_params;
+    UART_RxCallbackOptionsT cb_opts;
     CMDL_OptionsT cmdl_options;
     int8_t result;
 
     // initialize UART and STDIO:
-    result = UART_Init (UART_Baud_230400,
-                        UART_Parity_off,
-                        UART_StopBit_1,
-                        UART_CharSize_8,
-                        UART_Transceive_RxTx);
-    if(result != UART_OK)
+    memset(&led_params, 0, sizeof(led_params));
+    led_params.txLedPortPtr = &PORTA;
+    led_params.txLedDdrPtr  = &DDRA;
+    led_params.txLedIdx     = 6;
+    led_params.rxLedPortPtr = &PORTA;
+    led_params.rxLedDdrPtr  = &DDRA;
+    led_params.rxLedIdx     = 7;
+
+    appUartHandle = UART_Init(0,
+                              UART_Baud_230400,
+                              UART_Parity_off,
+                              UART_StopBit_1,
+                              UART_CharSize_8,
+                              UART_Transceive_RxTx,
+                              &led_params);
+    if(appUartHandle == NULL)
     {
         return(-1);
     }
@@ -109,19 +121,21 @@ static int8_t appInit(void)
     // register listen abort function:
     cb_opts.execOnRxWait = 1;
     cb_opts.writeRxToBuffer = 1;
-    result = UART_CallbackRxRegister('q', appListenAbortFunc, NULL, cb_opts);
+    result = UART_RegisterRxCallback(appUartHandle, 'q', 
+                                     appListenAbortFunc, NULL, cb_opts);
     if(result != UART_OK)
     {
-        printf("UART_CallbackRxRegister: %d\n", result);
+        printf("UART_RegisterRxCallback: %d\n", result);
         return(-1);
     }
+
     // enable interrupts:
     sei();
 
     // initialize CMDL:
     cmdl_options.flushRxAfterExec = 1;
     cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(cmdl_options);
+    result = CMDL_Init(appUartHandle, cmdl_options);
     if(result != CMDL_OK)
     {
         printf("CMDL_Init: %d\n", result);
@@ -175,7 +189,7 @@ static int8_t appInit(void)
 */
 static int appStdioPut(char chr, FILE* streamPtr)
 {
-    UART_TxByte(chr);
+    UART_TxByte(appUartHandle, chr);
     return(0);
 }
 
@@ -194,7 +208,7 @@ static int appStdioPut(char chr, FILE* streamPtr)
 */
 static int appStdioGet(FILE* streamPtr)
 {
-    return((int)UART_RxByte());
+    return((int)UART_RxByte(appUartHandle));
 }
 
 /*!
@@ -579,7 +593,7 @@ int main(int argc, char* argv[])
 {
     if(appInit()) return(-1);
     CMDL_Run();
-    UART_TxFlush();
+    UART_TxFlush(appUartHandle);
     return(0);
 }
 
