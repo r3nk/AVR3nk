@@ -574,13 +574,13 @@ static void uartIsrTx (uartHandleT* handlePtr)
 **
 *******************************************************************************
 */
-UART_HandleT UART_Init (uint8_t          id,
-                        UART_BaudT       baudRate,
-                        UART_ParityT     parityMode,
-                        UART_StopBitT    stopBitMode,
-                        UART_CharSizeT   charSizeMode,
-                        UART_TransceiveT transceiveMode,
-                        UART_LedParamsT* ledParamsPtr)
+UART_HandleT UART_Init (UART_InterfaceIdT id,
+                        UART_BaudT        baudRate,
+                        UART_ParityT      parityMode,
+                        UART_StopBitT     stopBitMode,
+                        UART_CharSizeT    charSizeMode,
+                        UART_TransceiveT  transceiveMode,
+                        UART_LedParamsT*  ledParamsPtr)
 {
     uartHandleT* handlePtr = NULL;
     uint8_t sreg_save = 0;
@@ -626,7 +626,7 @@ UART_HandleT UART_Init (uint8_t          id,
 #endif
 
 #if (UART_PORT_FACTOR == UART_MULTIPORT_2)
-    if(id == 0)
+    if(id == UART_InterfaceId0)
     {
         handlePtr->udrPtr   = &UDR0;
         handlePtr->ucsraPtr = &UCSR0A;
@@ -635,7 +635,7 @@ UART_HandleT UART_Init (uint8_t          id,
         ubrrh_ptr            = &UBRR0H;
         ubrrl_ptr            = &UBRR0L;
     }
-    if(id == 1)
+    if(id == UART_InterfaceId1)
     {
         handlePtr->udrPtr   = &UDR1;
         handlePtr->ucsraPtr = &UCSR1A;

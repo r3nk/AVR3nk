@@ -84,6 +84,12 @@
 /*! UART handle, which corresponds to a particular UART port. */
 typedef void* UART_HandleT;
 
+typedef enum
+{
+    UART_InterfaceId0 = 0,
+    UART_InterfaceId1
+} UART_InterfaceIdT;
+
 /*! Specifies baud rate settings that can be used for driving the
 **  UART interface.
 */
@@ -164,13 +170,13 @@ typedef struct
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-UART_HandleT UART_Init(uint8_t          id,
-                       UART_BaudT       baudRate,
-                       UART_ParityT     parityMode,
-                       UART_StopBitT    stopBitMode,
-                       UART_CharSizeT   charSizeMode,
-                       UART_TransceiveT transceiveMode,
-                       UART_LedParamsT* ledParamsPtr);
+UART_HandleT UART_Init (UART_InterfaceIdT id,
+                        UART_BaudT        baudRate,
+                        UART_ParityT      parityMode,
+                        UART_StopBitT     stopBitMode,
+                        UART_CharSizeT    charSizeMode,
+                        UART_TransceiveT  transceiveMode,
+                        UART_LedParamsT*  ledParamsPtr);
 int8_t  UART_IsInitialized(UART_HandleT handle);
 int8_t  UART_RegisterRxTriggerCallback(UART_HandleT handle,
                                        void (*funcPtr)(void* optArgPtr, 

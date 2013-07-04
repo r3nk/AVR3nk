@@ -208,7 +208,7 @@ static int8_t appInit(void)
     led_params.rxLedDdrPtr  = &DDRA;
     led_params.rxLedIdx     = 7;
 
-    appUartHandle = UART_Init(0,
+    appUartHandle = UART_Init(UART_InterfaceId0,
                               UART_Baud_230400,
                               UART_Parity_off,
                               UART_StopBit_1,
