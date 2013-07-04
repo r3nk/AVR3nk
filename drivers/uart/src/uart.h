@@ -48,8 +48,8 @@
 #endif
 
 //! Set to 1 to enable nested interrupts within rx callback functions. 
-#ifndef UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPT
-#define UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPT    1
+#ifndef UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
+#define UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS   1
 #endif
 
 //! CPU frequency

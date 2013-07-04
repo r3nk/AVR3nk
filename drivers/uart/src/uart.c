@@ -422,7 +422,7 @@ static void uartIsrRx (uartHandleT* handlePtr)
     uint8_t rx; // received value
     uint8_t ii; // temporary counter
     uint8_t write_rx = 1; // indicates whether to write to the rx buffer
-#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPT
+#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
     uint8_t sreg_save = 0;
 #endif
 
@@ -473,18 +473,18 @@ static void uartIsrRx (uartHandleT* handlePtr)
             if ((handlePtr->rxWaiting == 0)
             ||  (handlePtr->rxCallbackArray[ii].state.execOnRxWait))
             {
-#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPT
+#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
                 // Allow nested interrupt temporarily for callback:
                 sreg_save = SREG;
                 sei();
-#endif // UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPT
+#endif // UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
                 handlePtr->rxCallbackArray[ii].funcPtr(
                         handlePtr->rxCallbackArray[ii].optArgPtr);
                 write_rx =
                         handlePtr->rxCallbackArray[ii].state.writeRxToBuffer;
-#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPT
+#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
                 SREG = sreg_save;
-#endif // UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPT
+#endif // UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
             }
         }
     }
