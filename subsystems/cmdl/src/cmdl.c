@@ -270,7 +270,7 @@ int8_t CMDL_Init(UART_HandleT uartHandle, CMDL_OptionsT options)
     callbackOptions.execOnRxWait = 0;
     callbackOptions.writeRxToBuffer = 0;
     ret_code = UART_RegisterRxCallback(uartHandle,
-                                       0x0D, // carriage return
+                                       0x0A, // line feed (LF)
                                        cmdlCallbackExec,
                                        NULL, callbackOptions);
     if (ret_code != UART_OK)
@@ -374,7 +374,7 @@ int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
         if(cmdlCmdArray[ii].namePtr == NULL)
         {
 #if CMDL_DEBUG
-            printf(CMDL_LABEL "registering command: %s\n", name);
+            printf(CMDL_LABEL "registering command: %s\n", namePtr);
 #endif // CMDL_DEBUG
             cmdlCmdArray[ii].funcPtr = funcPtr;
             cmdlCmdArray[ii].namePtr = namePtr;
@@ -425,6 +425,12 @@ void CMDL_Run(void)
                                    (uint8_t*)cmdlCmdString,
                                    CMDL_MAX_COMMAND_LENGTH);
             cmdlCmdString[cmd_len] = '\0'; // terminate string
+            
+            // Remove carriage return in case of CR+LF
+            if(cmdlCmdString[cmd_len - 1] == 0x0D) // carriage return
+            {
+                cmdlCmdString[cmd_len - 1] = '\0';
+            }
 
             // parse the string into tokens:
             argc = 0;
