@@ -48,6 +48,7 @@
 //********************** LOCAL FUNCTION DECLARATIONS **************************
 //*****************************************************************************
 
+static UART_HandleT appUartHandle = NULL;
 static int8_t appInit(void);
 static int    appStdioPut(char chr, FILE* streamPtr);
 static int    appStdioGet(FILE* streamPtr);
@@ -167,13 +168,13 @@ int main(int argc, char* argv[])
 
             #if APP_DEBUG
             printf("MCP2515_Transmit: %d\n", result);
-            UART_TxFlush();
+            UART_TxFlush(appUartHandle);
             #endif
             if(result < 0)
             {
                 #if !APP_DEBUG
                 printf("MCP2515_Transmit: %d\n", result);
-                UART_TxFlush();
+                UART_TxFlush(appUartHandle);
                 #endif
                 // wait for watchdog to trigger reset:
                 while(1);
@@ -181,7 +182,7 @@ int main(int argc, char* argv[])
         }
         wdt_disable();
         CMDL_Run();
-        UART_TxFlush();
+        UART_TxFlush(appUartHandle);
     }
     return(0);
 }
@@ -192,21 +193,34 @@ int main(int argc, char* argv[])
 
 static int8_t appInit(void)
 {
-    UART_CallbackRxOptionsT rx_options;
+    UART_LedParamsT led_params;
+    UART_RxCallbackOptionsT rx_options;
     CMDL_OptionsT cmdl_options;
     MCP2515_InitParamsT appCanParams;
     int8_t result;
 
     // initialize UART and STDIO:
-    result = UART_Init (UART_Baud_115200,
-                        UART_Parity_off,
-                        UART_StopBit_1,
-                        UART_CharSize_8,
-                        UART_Transceive_RxTx);
-    if(result != UART_OK)
+    memset(&led_params, 0, sizeof(led_params));
+    led_params.txLedPortPtr = &PORTA;
+    led_params.txLedDdrPtr  = &DDRA;
+    led_params.txLedIdx     = 6;
+    led_params.rxLedPortPtr = &PORTA;
+    led_params.rxLedDdrPtr  = &DDRA;
+    led_params.rxLedIdx     = 7;
+
+    appUartHandle = UART_Init(UART_InterfaceId0,
+                              UART_Baud_230400,
+                              UART_Parity_off,
+                              UART_StopBit_1,
+                              UART_CharSize_8,
+                              UART_Transceive_RxTx,
+                              &led_params);
+    if(appUartHandle == NULL)
     {
         return(-1);
     }
+
+    // assign stdio:
     stdout = &appStdio;
     stdin  = &appStdio;
     sei();
@@ -215,7 +229,8 @@ static int8_t appInit(void)
     memset(&rx_options, 0, sizeof(rx_options));
     rx_options.execOnRxWait = 0;
     rx_options.writeRxToBuffer = 0;
-    result = UART_CallbackRxRegister((uint8_t)'q',
+    result = UART_RegisterRxCallback(appUartHandle,
+                                     (uint8_t)'q',
                                      appEnterCmdlFunc,
                                      NULL,
                                      rx_options);
@@ -223,7 +238,7 @@ static int8_t appInit(void)
     // initialize CMDL:
     cmdl_options.flushRxAfterExec = 1;
     cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(cmdl_options);
+    result = CMDL_Init(appUartHandle, cmdl_options);
     if(result != CMDL_OK)
     {
         printf("CMDL could not be initialized: %d\n", result);
@@ -269,13 +284,13 @@ static int8_t appInit(void)
 
 static int appStdioPut(char chr, FILE* streamPtr)
 {
-    UART_TxByte(chr);
+    UART_TxByte(appUartHandle, chr);
     return(0);
 }
 
 static int appStdioGet(FILE* streamPtr)
 {
-    return((int)UART_RxByte());
+    return((int)UART_RxByte(appUartHandle));
 }
 
 static void appEnterCmdlFunc (void* optArgPtr)

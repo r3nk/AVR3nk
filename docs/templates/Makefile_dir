@@ -19,8 +19,8 @@
 ## Directory Settings
 ################################################################
 
-TOPDIR = < relative path to top directory >
-SUBDIR = < relative path from top directory to this directory >
+TOPDIR := < relative path to top directory >
+SUBDIR := < relative path from top directory to this directory >
 
 DIRECTORIES := < 1st subdirectory >
 DIRECTORIES += < 2nd subdirectory >

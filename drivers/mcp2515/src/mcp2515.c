@@ -13,6 +13,10 @@
 *******************************************************************************
 */
 
+#include "mcp2515.h"
+#include "mcp2515_priv.h"
+#include "mcp2515_config.h"
+
 #include <stdint.h>
 #include <string.h>
 #include <avr/io.h>
@@ -20,9 +24,6 @@
 #include <util/delay.h>
 #include <drivers/macros_pin.h>
 #include <drivers/spi_m.h>
-#include "mcp2515.h"
-#include "mcp2515_priv.h"
-#include "mcp2515_config.h"
 
 #if MCP2515_DEBUG
 #include <stdio.h>

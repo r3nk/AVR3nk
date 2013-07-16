@@ -1,7 +1,10 @@
 AVR3nk
 ================
 
-AVR3nk is a cross-platform build environment and a library collection for [Atmel's 8-bit AVR](http://www.atmel.com/products/microcontrollers/avr/default.aspx) microcontrollers. It allows to maintain libraries and applications for different kinds of 8-bit AVR microcontrollers and is especially useful for team development. AVR3nk can be used on Linux, Mac OS X, and Windows. It includes an interrupt-driven and buffered driver for dual UART operation, a commandline interface (e.g., for interactive module testing), as well as an interrupt-driven driver for the MCP2515 [CAN](http://en.wikipedia.org/wiki/CAN_bus) controller, which interfaces via [SPI](http://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus). 
+AVR3nk is a cross-platform build environment based on [Make][make] and the AVR-GCC toolchain. 
+It allows to maintain libraries and applications for different kinds of [Atmel's 8-bit AVR](http://www.atmel.com/products/microcontrollers/avr/default.aspx) microcontrollers and is especially useful for team development. AVR3nk can be used on Linux, Mac OS X, and Windows. 
+
+Up to now, AVR3nk includes an interrupt-driven and buffered driver for dual UART operation, a commandline interface (e.g., for interactive module testing), as well as an interrupt-driven driver for the MCP2515 [CAN](http://en.wikipedia.org/wiki/CAN_bus) controller, which interfaces via [SPI](http://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus). 
 
 
 Motivation
@@ -25,7 +28,7 @@ You must install the following packages in order to use AVR3nk:
 
 **Linux**: Most Linux distributions have an AVR-GCC toolchain in their packet managers. 
 
-**Mac OS OX**: I personally prefer installing the toolchain via [MacPorts](http://www.macports.org). Alternatively, there is [CrossPack](http://www.obdev.at/products/crosspack/index.html) and [OSX-AVR](http://sourceforge.net/projects/osxavr) (I haven't tried these yet). 
+**Mac OS OX**: I recommend installing the toolchain via [MacPorts](http://www.macports.org). Alternatively, there is [CrossPack](http://www.obdev.at/products/crosspack/index.html) and [OSX-AVR](http://sourceforge.net/projects/osxavr) (I haven't tried these latter ones). 
 
 **Windows**: Download and install [WinAVR](http://winavr.sourceforge.net). 
 
@@ -48,7 +51,7 @@ The following Make targets are available:
 * **build**: Compiles the source code. For libraries, it will also create (or update) a library archive if source files were updated. For an application, it will also build library dependencies into the application's build directory and link everything to an executable which can be programmed to AVR hardware. The build command compiles only files that were changed since the last compilation. 
 * **headers**: Copies the header files of a library to the install directory. 
 * **install**: Copies the pre-compiled archive file of a library to the install directory. 
-* **all**: Rebuilds everything anew. For libraries, *all* expands to *clean* *headers* *build* *install*. For applications, *all* expands to *clean* *build*. In AVR3nk's top directory, *all* also removes all files in the *install* directory. 
+* **all**: Rebuilds everything anew. For libraries, it expands to *clean* *headers* *build* *install*. For applications, it expands to *clean* *build*. In AVR3nk's top directory, it also removes all files in the install directory prior to processing of subdirectories. 
 * **program**: This target is only valid for applications. It invokes avrdude to write the programming file to the AVR microcontroller. 
 * **size**: Displays the size of a program. This target works only for applications. 
 
@@ -110,9 +113,7 @@ AVR3nk was initially created in 2009 at the [Sailing Team Darmstadt e.V.](http:/
 Contributing
 ----------------
 
-If you like to contribute to AVR3nk, feel free to contact me. I'm willing to add further libraries.
-
-So far, I've mainly tested the libraries on atmega644p, atmega644 and atmega16 devices. Adding support for other devices is easy, but I won't buy all the different microcontrollers just to test my code. So if you have successfully patched one or several libraries for other AVR devices, drop me a line. 
+If you like to contribute to AVR3nk, feel free to contact me. 
 
 
 [make]: http://en.wikipedia.org/wiki/Make_(software)

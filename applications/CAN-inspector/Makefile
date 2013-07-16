@@ -7,8 +7,8 @@
 ## - SOURCES
 ## - HEADERS
 ## - LIBRARIES
-## - DEPBUILD_ITERATIVE_LIBRARIES
-## - DEPBUILD_RECURSIVE_LIBRARIES
+## - DEPBUILDS_ITERATIVE
+## - DEPBUILDS_RECURSIVE
 ## - MCU
 ##
 ## Available Make targets: 
@@ -21,14 +21,14 @@
 ##
 ################################################################
 
-APPLICATION = CAN-inspector
+APPLICATION := CAN-inspector
 
 ################################################################
 ## Directory Settings
 ################################################################
 
-TOPDIR = ../..
-SUBDIR = applications/CAN-inspector
+TOPDIR := ../..
+SUBDIR := applications/CAN-inspector
 
 ################################################################
 ## Sources
@@ -45,10 +45,8 @@ APP_MACROS += UART_ERROR_HANDLING=1
 APP_MACROS += UART_BUFFER_LENGTH_RX=128
 APP_MACROS += UART_BUFFER_LENGTH_TX=128
 APP_MACROS += UART_CALLBACK_COUNT=3
-APP_MACROS += UART_LED_MODE=1
-APP_MACROS += UART_RX_LED=B,2
-APP_MACROS += UART_TX_LED=B,3
-APP_MACROS += UART_PORT=0
+APP_MACROS += UART_INTERRUPT_SAFETY=0
+APP_MACROS += UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS=0
 APP_MACROS += CMDL_MAX_COMMAND_LENGTH=64
 APP_MACROS += CMDL_MAX_COMMAND_COUNT=16
 APP_MACROS += CMDL_MAX_ARGUMENT_COUNT=16

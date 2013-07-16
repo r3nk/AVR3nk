@@ -63,13 +63,15 @@ char* strtok (char* s, const char* delim);
 /*! State variable keeps track of CMDL state parameters. */
 volatile static struct
 {
-    uint8_t initialized : 1; //<! Indicates whether CMDL has been initialized
-    uint8_t running : 1; //<! Indicates whether the command line is running.
-    uint8_t exec    : 1; //<! Indicates whether a program is in execution.
+    uint8_t initialized      : 1; //<! Indicates whether CMDL has been initialized
+    uint8_t running          : 1; //<! Indicates whether the command line is running.
+    uint8_t exec             : 1; //<! Indicates whether a program is in execution.
+    uint8_t flushRxAfterExec : 1; //<! see description of CMDL_OptionsT
+    uint8_t flushTxOnExit    : 1; //<! see description of CMDL_OptionsT
 } cmdlState;
 
-/*! Options defined by the user. */
-static CMDL_OptionsT cmdlOptions;
+/*! The associated UART handle. */
+static UART_HandleT cmdlUartHandle;
 
 /*! The prompt string with a leading newline. */
 static char* cmdlPromptStr = "\n" CMDL_PROMPT;
@@ -241,12 +243,12 @@ void cmdlDumpCmdString(void)
 **
 *******************************************************************************
 */
-int8_t CMDL_Init(CMDL_OptionsT options)
+int8_t CMDL_Init(UART_HandleT uartHandle, CMDL_OptionsT options)
 {
     int8_t ret_code;
-    UART_CallbackRxOptionsT callbackOptions;
+    UART_RxCallbackOptionsT callbackOptions;
 
-    if(UART_IsInitialized() == 0)
+    if(UART_IsInitialized(uartHandle) == 0)
     {
         return(CMDL_ERR_UART_NOT_INITIALIZED);
     }
@@ -256,9 +258,10 @@ int8_t CMDL_Init(CMDL_OptionsT options)
     // register backspace callback:
     callbackOptions.execOnRxWait = 0;
     callbackOptions.writeRxToBuffer = 0;
-    ret_code = UART_CallbackRxRegister(0x08, // backspace
-                                       UART_CallbackRxBackspace,
-                                       NULL, callbackOptions);
+    ret_code = UART_RegisterRxCallback(uartHandle,
+                                       0x08, // backspace
+                                       UART_RxCallbackOnBackspace,
+                                       uartHandle, callbackOptions);
     if (ret_code != UART_OK)
     {
         return (CMDL_ERR_UART_NOT_OK);
@@ -266,7 +269,8 @@ int8_t CMDL_Init(CMDL_OptionsT options)
     // register execute callback:
     callbackOptions.execOnRxWait = 0;
     callbackOptions.writeRxToBuffer = 0;
-    ret_code = UART_CallbackRxRegister(0x0D, // carriage return
+    ret_code = UART_RegisterRxCallback(uartHandle,
+                                       0x0A, // line feed (LF)
                                        cmdlCallbackExec,
                                        NULL, callbackOptions);
     if (ret_code != UART_OK)
@@ -303,10 +307,12 @@ int8_t CMDL_Init(CMDL_OptionsT options)
     }
 
     // apply options and state:
-    cmdlOptions = options;
-    cmdlState.running     = 0;
-    cmdlState.exec        = 0;
-    cmdlState.initialized = 1;
+    cmdlUartHandle = uartHandle;
+    cmdlState.flushRxAfterExec  = options.flushRxAfterExec;
+    cmdlState.flushTxOnExit     = options.flushTxOnExit;
+    cmdlState.running           = 0;
+    cmdlState.exec              = 0;
+    cmdlState.initialized       = 1;
     return(CMDL_OK);
 }
 
@@ -368,7 +374,7 @@ int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
         if(cmdlCmdArray[ii].namePtr == NULL)
         {
 #if CMDL_DEBUG
-            printf(CMDL_LABEL "registering command: %s\n", name);
+            printf(CMDL_LABEL "registering command: %s\n", namePtr);
 #endif // CMDL_DEBUG
             cmdlCmdArray[ii].funcPtr = funcPtr;
             cmdlCmdArray[ii].namePtr = namePtr;
@@ -403,11 +409,11 @@ void CMDL_Run(void)
     cmdlState.exec = 0;
 
     // print the prompt:
-    //UART_TxField((uint8_t*)cmdlPromptStr, strlen(cmdlPromptStr));
+    //UART_TxField(cmdlUartHandle, (uint8_t*)cmdlPromptStr, strlen(cmdlPromptStr));
     printf(cmdlPromptStr);
 
     // discard the rx buffer:
-    UART_RxDiscard();
+    UART_RxDiscard(cmdlUartHandle);
 
     while(cmdlState.running)
     {
@@ -415,8 +421,16 @@ void CMDL_Run(void)
         {
             // read the command from rx buffer into CMDL's command buffer:
             memset(cmdlCmdString, 0, sizeof(cmdlCmdString));
-            cmd_len = UART_RxField((uint8_t*)cmdlCmdString, CMDL_MAX_COMMAND_LENGTH);
+            cmd_len = UART_RxField(cmdlUartHandle,
+                                   (uint8_t*)cmdlCmdString,
+                                   CMDL_MAX_COMMAND_LENGTH);
             cmdlCmdString[cmd_len] = '\0'; // terminate string
+            
+            // Remove carriage return in case of CR+LF
+            if(cmdlCmdString[cmd_len - 1] == 0x0D) // carriage return
+            {
+                cmdlCmdString[cmd_len - 1] = '\0';
+            }
 
             // parse the string into tokens:
             argc = 0;
@@ -447,18 +461,18 @@ void CMDL_Run(void)
             {
                 printf(cmdlPromptStr);
             }
-            if(cmdlOptions.flushRxAfterExec)
+            if(cmdlState.flushRxAfterExec)
             {
                 // Discard the receive buffer before next execution starts:
-                UART_RxDiscard();
+                UART_RxDiscard(cmdlUartHandle);
             }
             cmdlState.exec = 0;
         }
     }
     // flush the tx buffer:
-    if(cmdlOptions.flushTxOnExit)
+    if(cmdlState.flushTxOnExit)
     {
-        UART_TxFlush();
+        UART_TxFlush(cmdlUartHandle);
     }
     return;
 }
@@ -466,10 +480,10 @@ void CMDL_Run(void)
 #if ( __AVR_LIBC_VERSION__ < 10603UL )
 /*!
 *******************************************************************************
-** \brief   This is a implementation of the strtok function which is available
-**          in avr-libc from version 1.06.03 on. If the installed library's 
-**          version is older, this implementation will be used.
-**          This procedure is NOT reentrant.
+** \brief   This is an implementation of the strtok function which is available
+**          in avr-libc from version 1.06.03 on. If the version of avr-libc
+**          is older, this implementation will be used.
+**          The procedure is NOT reentrant.
 *******************************************************************************
 */
 char* strtok (char* s, const char* delim)

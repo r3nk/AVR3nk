@@ -24,48 +24,38 @@
 
 //! Determines whether error handling is active.
 #ifndef UART_ERROR_HANDLING
-    #define UART_ERROR_HANDLING     1
-#endif // UART_ERROR_HANDLING
+#define UART_ERROR_HANDLING     0
+#endif
 
 //! rx buffer length, must be in range [1 ... 255]
 #ifndef UART_BUFFER_LENGTH_RX
-    #define UART_BUFFER_LENGTH_RX   64
-#endif // UART_BUFFER_LENGTH_RX
+#define UART_BUFFER_LENGTH_RX   64
+#endif
 
 //! tx buffer length, must be in range [1 ... 255]
 #ifndef UART_BUFFER_LENGTH_TX
-    #define UART_BUFFER_LENGTH_TX   64
-#endif // UART_BUFFER_LENGTH_TX
+#define UART_BUFFER_LENGTH_TX   128
+#endif
 
-//! count of callback functions that can be assigned to specific rx values
-#ifndef UART_CALLBACK_COUNT
-    #define UART_CALLBACK_COUNT     3
-#endif // UART_CALLBACK_COUNT
+//! Count of callback functions that can be assigned to specific rx values.
+#ifndef UART_RX_CALLBACK_COUNT
+#define UART_RX_CALLBACK_COUNT  3
+#endif
 
-//! enable/disable rx and tx LEDs for the UART
-#ifndef UART_LED_MODE
-    #define UART_LED_MODE           1
-#endif // UART_LED_MODE
+//! Set to 1 if UART functions should be called from within ISRs.
+#ifndef UART_INTERRUPT_SAFETY
+#define UART_INTERRUPT_SAFETY   1
+#endif
 
-//! UART rx LED output: (PORT,PIN)
-#ifndef UART_RX_LED
-    #define UART_RX_LED             B,2
-#endif // UART_RX_LED
-
-//! UART tx LED output: (PORT,PIN)
-#ifndef UART_TX_LED
-    #define UART_TX_LED             B,3
-#endif // UART_TX_LED
-
-//! Port selector for multiport MCUs
-#ifndef UART_PORT
-    #define UART_PORT               0
-#endif // UART_PORT
+//! Set to 1 to enable nested interrupts within rx callback functions. 
+#ifndef UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
+#define UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS   1
+#endif
 
 //! CPU frequency
 #ifndef F_CPU
-    #define F_CPU                   8000000
-#endif // F_CPU
+#define F_CPU                   18432000
+#endif
 
 //*****************************************************************************
 //************************* UART SPECIFIC ERROR CODES *************************
@@ -80,15 +70,25 @@
 /*! A bad parameter has been passed. */
 #define UART_ERR_BAD_PARAMETER      UART_ERR_BASE - 1
 
-/*! There is no callback slot left. */
+/*! There is no callback slot free. */
 #define UART_ERR_NO_CALLBACK_SLOT   UART_ERR_BASE - 2
 
 /*! The callback function has not been found. */
 #define UART_ERR_CALLBACK_NOT_FOUND UART_ERR_BASE - 3
 
+
 //*****************************************************************************
 //******************************** DATA TYPES *********************************
 //*****************************************************************************
+
+/*! UART handle, which corresponds to a particular UART port. */
+typedef void* UART_HandleT;
+
+typedef enum
+{
+    UART_InterfaceId0 = 0,
+    UART_InterfaceId1
+} UART_InterfaceIdT;
 
 /*! Specifies baud rate settings that can be used for driving the
 **  UART interface.
@@ -142,6 +142,17 @@ typedef enum
     UART_Transceive_RxTx    //<! Rx and Tx enabled
 } UART_TransceiveT;
 
+/*! Specifies a PIN which will be lit on rx and tx activity respectively. */
+typedef struct
+{
+    volatile uint8_t* txLedPortPtr;
+    volatile uint8_t* rxLedPortPtr;
+    volatile uint8_t* txLedDdrPtr;
+    volatile uint8_t* rxLedDdrPtr;
+    uint8_t           txLedIdx : 3;
+    uint8_t           rxLedIdx : 3;
+} UART_LedParamsT;
+
 /*! UART specific callback options. */
 typedef struct
 {
@@ -153,41 +164,50 @@ typedef struct
     **  callback is executed.
     */
     uint8_t writeRxToBuffer : 1;
-} UART_CallbackRxOptionsT;
+} UART_RxCallbackOptionsT;
 
 //*****************************************************************************
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-int8_t  UART_Init (UART_BaudT       baudRate,       \
-                   UART_ParityT     parityMode,     \
-                   UART_StopBitT    stopBitMode,    \
-                   UART_CharSizeT   charSizeMode,   \
-                   UART_TransceiveT transceiveMode);
-int8_t  UART_IsInitialized (void);
-int8_t  UART_SetBaudRate(UART_BaudT baudRate);
-int8_t  UART_SetParity (UART_ParityT parityMode);
-int8_t  UART_SetStopBit (UART_StopBitT stopBitMode);
-int8_t  UART_SetCharSize (UART_CharSizeT charSizeMode);
-int8_t  UART_SetTransceiveMode (UART_TransceiveT transceiveMode);
-int8_t  UART_CallbackRxRegister (uint8_t byte,                      \
-                                 void (*funcPtr) (void* optArgPtr), \
-                                 void* optArgPtr,                   \
-                                 UART_CallbackRxOptionsT options);
-int8_t  UART_CallbackRxUnregister (uint8_t byte);
-void    UART_CallbackRxBackspace (void* optArgPtr);
-void    UART_TxByte (uint8_t byte);
-uint8_t UART_RxByte (void);
-uint8_t UART_TxField (uint8_t* fieldPtr, uint8_t byteCount);
-uint8_t UART_RxField (uint8_t* fieldPtr, uint8_t byteCount);
-void    UART_RxDiscard (void);
-void    UART_TxFlush (void);
+UART_HandleT UART_Init (UART_InterfaceIdT id,
+                        UART_BaudT        baudRate,
+                        UART_ParityT      parityMode,
+                        UART_StopBitT     stopBitMode,
+                        UART_CharSizeT    charSizeMode,
+                        UART_TransceiveT  transceiveMode,
+                        UART_LedParamsT*  ledParamsPtr);
+int8_t  UART_IsInitialized(UART_HandleT handle);
+int8_t  UART_RegisterRxTriggerCallback(UART_HandleT handle,
+                                       void (*funcPtr)(void* optArgPtr, 
+                                                       uint8_t rxByte), 
+                                       void* optArgPtr,
+                                       UART_RxCallbackOptionsT options);
+int8_t  UART_UnregisterRxTriggerCallback(UART_HandleT handle);
+int8_t  UART_RegisterRxCallback(UART_HandleT handle, 
+                                uint8_t rxByte,
+                                void (*funcPtr)(void* optArgPtr), 
+                                void* optArgPtr,
+                                UART_RxCallbackOptionsT options);
+int8_t  UART_UnregisterRxCallback(UART_HandleT handle, uint8_t rxByte);
+void    UART_RxCallbackOnBackspace(void* optArgPtr); 
+
+void    UART_TxByte(UART_HandleT handle, uint8_t byte);
+uint8_t UART_RxByte(UART_HandleT handle);
+uint8_t UART_TxField(UART_HandleT handle, uint8_t* fieldPtr, uint8_t byteCount);
+uint8_t UART_RxField(UART_HandleT handle, uint8_t* fieldPtr, uint8_t byteCount);
+void    UART_RxDiscard(UART_HandleT handle);
+void    UART_TxFlush(UART_HandleT handle);
 
 #if UART_ERROR_HANDLING
-void UART_SetFrameErrorHandler(void (*frameErrorHandlerPtr) (void));
-void UART_SetDataOverRunHandler(void (*dataOverRunHandlerPtr) (void));
-void UART_SetParityErrorHandler(void (*parityErrorHandlerPtr) (void));
-void UART_SetRxBufferOverflowHandler(void (*rxBufferOverflowHandlerPtr) (void));
+void UART_SetFrameErrorHandler      (UART_HandleT handle,
+                                     void (*frameErrorHandlerPtr) (void));
+void UART_SetDataOverRunHandler     (UART_HandleT handle,
+                                     void (*dataOverRunHandlerPtr) (void));
+void UART_SetParityErrorHandler     (UART_HandleT handle,
+                                     void (*parityErrorHandlerPtr) (void));
+void UART_SetRxBufferOverflowHandler(UART_HandleT handle,
+                                     void (*rxBufferOverflowHandlerPtr) (void));
 #endif // UART_ERROR_HANDLING
 
 #endif // UART_H

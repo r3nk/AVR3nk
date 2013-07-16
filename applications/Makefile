@@ -19,8 +19,8 @@
 ## Directory Settings
 ################################################################
 
-TOPDIR = ..
-SUBDIR = applications
+TOPDIR := ..
+SUBDIR := applications
 
 DIRECTORIES := demo_cmdl
 DIRECTORIES += demo_sensor
