@@ -1,0 +1,4 @@
+# Text files (auto detected + patterns) are LF normalized:
+*        text=auto
+/Make.*  text
+
