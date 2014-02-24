@@ -18,9 +18,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <avr/interrupt.h>
 #include <drivers/uart.h>
 #include <subsystems/cmdl.h>
+
 
 //*****************************************************************************
 //*************************** DEFINES AND MACROS ******************************
@@ -40,10 +42,12 @@ static int8_t appInit(void);
 static int    appStdioPut(char chr, FILE* streamPtr);
 static int    appStdioGet(FILE* streamPtr);
 
+
 //*****************************************************************************
 //**************************** LOCAL VARIABLES ********************************
 //*****************************************************************************
 
+static UART_HandleT appUartHandle = NULL;
 static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
 
 
@@ -66,16 +70,28 @@ static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_R
 */
 static int8_t appInit(void)
 {
+    UART_LedParamsT led_params;
+    UART_RxCallbackOptionsT cb_opts;
     CMDL_OptionsT cmdl_options;
     int8_t result;
 
     // initialize UART and STDIO:
-    result = UART_Init (UART_Baud_38400,
-                        UART_Parity_off,
-                        UART_StopBit_1,
-                        UART_CharSize_8,
-                        UART_Transceive_RxTx);
-    if(result != UART_OK)
+    memset(&led_params, 0, sizeof(led_params));
+    led_params.txLedPortPtr = &PORTA;
+    led_params.txLedDdrPtr  = &DDRA;
+    led_params.txLedIdx     = 6;
+    led_params.rxLedPortPtr = &PORTA;
+    led_params.rxLedDdrPtr  = &DDRA;
+    led_params.rxLedIdx     = 7;
+
+    appUartHandle = UART_Init(UART_InterfaceId0,
+                              UART_Baud_230400,
+                              UART_Parity_off,
+                              UART_StopBit_1,
+                              UART_CharSize_8,
+                              UART_Transceive_RxTx,
+                              &led_params);
+    if(appUartHandle == NULL)
     {
         return(-1);
     }
@@ -88,12 +104,13 @@ static int8_t appInit(void)
     sei();
 
     // initialize CMDL:
+    memset(&cmdl_options, 0, sizeof(cmdl_options));
     cmdl_options.flushRxAfterExec = 1;
     cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(cmdl_options);
+    result = CMDL_Init(appUartHandle, cmdl_options);
     if(result != CMDL_OK)
     {
-        printf("CMDL could not be initialized: %d\n", result);
+        printf("CMDL_Init: %d\n", result);
         return(-1);
     }
 
@@ -119,7 +136,7 @@ static int8_t appInit(void)
 */
 static int appStdioPut(char chr, FILE* streamPtr)
 {
-    UART_TxByte(chr);
+    UART_TxByte(appUartHandle, chr);
     return(0);
 }
 
@@ -138,7 +155,7 @@ static int appStdioPut(char chr, FILE* streamPtr)
 */
 static int appStdioGet(FILE* streamPtr)
 {
-    return((int)UART_RxByte());
+    return((int)UART_RxByte(appUartHandle));
 }
 
 
@@ -150,7 +167,8 @@ static int appStdioGet(FILE* streamPtr)
 *******************************************************************************
 ** \brief   Main procedure.
 **
-**          [TODO: give a short description of the program if necessary.]
+**          Initializes drivers and subsystems and runs a commandline
+**          interface.
 **
 ** \param   argc    Not used.
 ** \param   argv    Not used.
@@ -165,10 +183,11 @@ int main(int argc, char* argv[])
 {
     if(appInit()) return(-1);
     CMDL_Run();
-    UART_TxFlush();
+    UART_TxFlush(appUartHandle);
     return(0);
 }
 
 //*****************************************************************************
 //*********************** INTERRUPT SERVICE ROUTINES **************************
 //*****************************************************************************
+
