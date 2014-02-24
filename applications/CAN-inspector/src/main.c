@@ -119,6 +119,7 @@ static int8_t appInit(void)
     stdin  = &appStdio;
 
     // register listen abort function:
+    memset(&cb_opts, 0, sizeof(cb_opts));
     cb_opts.execOnRxWait = 1;
     cb_opts.writeRxToBuffer = 1;
     result = UART_RegisterRxCallback(appUartHandle, 'q', 
@@ -133,6 +134,7 @@ static int8_t appInit(void)
     sei();
 
     // initialize CMDL:
+    memset(&cmdl_options, 0, sizeof(cmdl_options));
     cmdl_options.flushRxAfterExec = 1;
     cmdl_options.flushTxOnExit = 1;
     result = CMDL_Init(appUartHandle, cmdl_options);
