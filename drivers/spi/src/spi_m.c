@@ -91,7 +91,10 @@ int8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
 
     // set up pin configuration:
 
-    // Set SS pin as output and drive high:
+    // See ATmega644p chapter 15.3
+    // If set as input, the SS pin can change the SPI master to a slave.
+    // This driver doesn't handle this, so set pin as output and use as CS.
+    // CS pin (chip select) is then handled by the respective device driver.
     DDR_SPI  |=  (1 << DD_SS);
     PORT_SPI |=  (1 << PORT_SS);
 

@@ -320,6 +320,10 @@ int8_t CMDL_Init(UART_HandleT uartHandle, CMDL_OptionsT options)
 *******************************************************************************
 ** \brief   Test whether CMDL is initialized.
 **
+** \return  
+**          - 1 if CMDL is initialized.
+**          - 0 if CMDL is not initialized.
+**
 *******************************************************************************
 */
 int8_t CMDL_IsInitialized(void)
