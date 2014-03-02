@@ -820,9 +820,8 @@ UART_HandleT UART_Init (UART_InterfaceIdT id,
 ** \param   handle      A handle associated with a specific AVR hardware UART.
 **
 ** \return
-**          - #UART_ERR_BAD_PARAMETER if handle is invalid.
 **          - 1 if the UART is initialized.
-**          - 0 if the UART is not initialized.
+**          - 0 if the UART is not initialized or if the handle is invalid.
 **
 *******************************************************************************
 */
@@ -832,7 +831,7 @@ int8_t UART_IsInitialized (UART_HandleT handle)
 
     if (handlePtr == NULL)
     {
-        return (UART_ERR_BAD_PARAMETER);
+        return 0;
     }
     return (handlePtr->initialized);
 }
@@ -1131,7 +1130,6 @@ void UART_RxCallbackOnBackspace (void* optArgPtr)
 */
 void UART_TxByte (UART_HandleT handle, uint8_t byte)
 {
-    uint8_t result = 0;
     uartHandleT* handlePtr = (uartHandleT*) handle;
 
     if (handlePtr == NULL) return;
@@ -1141,7 +1139,7 @@ void UART_TxByte (UART_HandleT handle, uint8_t byte)
     ////////////////
 
     // active waiting if buffer impends to overflow:
-    do
+    while (BUFFER_GetFreeSize(&handlePtr->txBuffer) == 0)
     {
         ////////////////
         uartLeaveTxCS(handlePtr);
@@ -1152,9 +1150,7 @@ void UART_TxByte (UART_HandleT handle, uint8_t byte)
         ////////////////
         uartEnterTxCS(handlePtr);
         ////////////////
-
-        result = BUFFER_GetFreeSize(&handlePtr->txBuffer);
-    } while (result == 0);
+    }
 
     // avoid txActive flag to be reset:
     UART_TX_COMPLETE_INT_OFF;
@@ -1192,7 +1188,6 @@ void UART_TxByte (UART_HandleT handle, uint8_t byte)
 uint8_t UART_RxByte (UART_HandleT handle)
 {
     uint8_t rxByte;
-    uint8_t result;
     uartHandleT* handlePtr = (uartHandleT*)handle;
 
     if (handlePtr == NULL) return ('\0');
@@ -1202,8 +1197,10 @@ uint8_t UART_RxByte (UART_HandleT handle)
     ////////////////
 
     // active waiting if buffer is empty, wait for valid input data
-    do
+    while (BUFFER_GetUsedSize(&handlePtr->rxBuffer) == 0)
     {
+        handlePtr->rxWaiting = 1;
+
         ////////////////
         uartLeaveRxCS(handlePtr);
         ////////////////
@@ -1213,10 +1210,8 @@ uint8_t UART_RxByte (UART_HandleT handle)
         ////////////////
         uartEnterRxCS(handlePtr);
         ////////////////
-
-        result = BUFFER_GetUsedSize(&handlePtr->rxBuffer);
-        handlePtr->rxWaiting = result ? 0 : 1;
-    } while (result == 0);
+    }
+    handlePtr->rxWaiting = 0;
     rxByte = BUFFER_ReadByte(&handlePtr->rxBuffer, NULL);
 
     ////////////////
