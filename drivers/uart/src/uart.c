@@ -16,8 +16,8 @@
 **          applications.
 **
 ** \attention
-**          DO NOT call UART_TxByte() or UART_TxField() when the global 
-**          interrupt is disabled (SREG_I bit in SREG)! 
+**          DO NOT call UART_TxByte() or UART_TxField() when the global
+**          interrupt is disabled (SREG_I bit in SREG)!
 **          Otherwise the MCU may hang up.
 **
 ** \attention
@@ -149,7 +149,9 @@ typedef struct
     uint8_t execOnRxWait : 1;
 
     /*! Indicates whether the read value will still be inserted into the
-    **  rx buffer or if it will be discarded.
+    **  rx buffer after callback execution or if it will be discarded.
+    **  If multiple callbacks are registered for the same character, this
+    **  parameter will be combined by a logical AND.
     */
     uint8_t writeRxToBuffer : 1;
 
@@ -166,6 +168,7 @@ typedef struct
     uartRxCallbackStateT state; //<! additional options and state
 } uartRxTriggerCallbackT;
 
+#if UART_RX_CALLBACK_COUNT
 /*! UART rx character callback structure. */
 typedef struct
 {
@@ -174,6 +177,7 @@ typedef struct
     void* optArgPtr; //<! optional arguments passed to the callback on execution
     uartRxCallbackStateT state; //<! additional options and state
 } uartRxCallbackT;
+#endif
 
 /*! Internal UART handle structure. */
 typedef struct
@@ -194,7 +198,9 @@ typedef struct
     uint8_t txBufferArray[UART_BUFFER_LENGTH_TX];
 
     uartRxTriggerCallbackT rxTriggerCallback;
+#if UART_RX_CALLBACK_COUNT
     uartRxCallbackT rxCallbackArray[UART_RX_CALLBACK_COUNT];
+#endif
 
 #ifdef UART_ERROR_HANDLING
     void (*frameErrorHandlerPtr) (void);
@@ -420,8 +426,12 @@ static void uartLeaveRxCS (uartHandleT* handlePtr)
 static void uartIsrRx (uartHandleT* handlePtr)
 {
     uint8_t rx; // received value
-    uint8_t ii; // temporary counter
     uint8_t write_rx = 1; // indicates whether to write to the rx buffer
+
+#if UART_RX_CALLBACK_COUNT
+    uint8_t ii; // temporary counter
+#endif
+
 #if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
     uint8_t sreg_save = 0;
 #endif
@@ -430,7 +440,7 @@ static void uartIsrRx (uartHandleT* handlePtr)
     uint8_t status;
     int8_t  result;
 #endif // UART_ERROR_HANDLING
-    
+
     rx = *handlePtr->udrPtr;
 
     UART_RX_LED_ON;
@@ -453,17 +463,26 @@ static void uartIsrRx (uartHandleT* handlePtr)
         if (handlePtr->parityErrorHandlerPtr) handlePtr->parityErrorHandlerPtr();
     }
 #endif // UART_ERROR_HANDLING
-    // execute rx trigger callback (any character): 
+    // execute rx trigger callback (any character):
     if (handlePtr->rxTriggerCallback.state.active)
     {
         if ((handlePtr->rxWaiting == 0)
         ||  (handlePtr->rxTriggerCallback.state.execOnRxWait))
         {
+#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
+            // Allow nested interrupt temporarily for callback:
+            sreg_save = SREG;
+            sei();
+#endif // UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
             handlePtr->rxTriggerCallback.funcPtr(
                     handlePtr->rxTriggerCallback.optArgPtr, rx);
             write_rx = handlePtr->rxTriggerCallback.state.writeRxToBuffer;
+#if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
+            SREG = sreg_save;
+#endif // UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
         }
     }
+#if UART_RX_CALLBACK_COUNT
     // execute character-specific rx callbacks:
     for (ii = 0; ii < UART_RX_CALLBACK_COUNT; ii++)
     {
@@ -480,7 +499,7 @@ static void uartIsrRx (uartHandleT* handlePtr)
 #endif // UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
                 handlePtr->rxCallbackArray[ii].funcPtr(
                         handlePtr->rxCallbackArray[ii].optArgPtr);
-                write_rx =
+                write_rx &=
                         handlePtr->rxCallbackArray[ii].state.writeRxToBuffer;
 #if UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
                 SREG = sreg_save;
@@ -488,11 +507,12 @@ static void uartIsrRx (uartHandleT* handlePtr)
             }
         }
     }
+#endif // UART_RX_CALLBACK_COUNT
     if (write_rx)
     {
 #if UART_ERROR_HANDLING
         BUFFER_WriteByte(&handlePtr->rxBuffer, rx, &result);
-        if ((result == BUFFER_ERR_FULL) 
+        if ((result == BUFFER_ERR_FULL)
         &&  (handlePtr->rxBufferOverflowHandlerPtr))
         {
             handlePtr->rxBufferOverflowHandlerPtr();
@@ -780,8 +800,10 @@ UART_HandleT UART_Init (UART_InterfaceIdT id,
     }
 
     // initialize local variables:
-    memset(handlePtr->rxCallbackArray, 0, 
+#if UART_RX_CALLBACK_COUNT
+    memset(handlePtr->rxCallbackArray, 0,
            UART_RX_CALLBACK_COUNT * sizeof(uartRxCallbackT));
+#endif
     handlePtr->rxWaiting = 0;
     handlePtr->initialized = 1;
 
@@ -818,7 +840,7 @@ int8_t UART_IsInitialized (UART_HandleT handle)
 /*!
 *******************************************************************************
 ** \brief   Register a callback function that is executed on the reception of
-**          any character. 
+**          any character.
 **
 **          The registered callback function will be executed every time
 **          when any character arrives on the rx input.
@@ -842,13 +864,13 @@ int8_t UART_IsInitialized (UART_HandleT handle)
 *******************************************************************************
 */
 int8_t UART_RegisterRxTriggerCallback (UART_HandleT handle,
-                                       void (*funcPtr)(void* optArgPtr, 
-                                                       uint8_t rxByte), 
+                                       void (*funcPtr)(void* optArgPtr,
+                                                       uint8_t rxByte),
                                        void* optArgPtr,
                                        UART_RxCallbackOptionsT options)
 {
     uartHandleT* handlePtr = (uartHandleT*)handle;
-    
+
     if ((handlePtr == NULL) || (funcPtr == NULL))
     {
         return (UART_ERR_BAD_PARAMETER);
@@ -875,7 +897,7 @@ int8_t UART_RegisterRxTriggerCallback (UART_HandleT handle,
 *******************************************************************************
 ** \brief   Unregister the rx trigger callback function.
 **
-**          All rx callbacks that have been registered with the #rxByte 
+**          All rx callbacks that have been registered with the #rxByte
 **          argument will be unregistered.
 **
 ** \param   handle  A handle associated with a specific AVR hardware UART.
@@ -903,7 +925,7 @@ int8_t UART_UnregisterRxTriggerCallback (UART_HandleT handle)
     ////////////////
 
     if (handlePtr->rxTriggerCallback.funcPtr) found = 1;
-    memset(&handlePtr->rxTriggerCallback, 0, 
+    memset(&handlePtr->rxTriggerCallback, 0,
            sizeof(handlePtr->rxTriggerCallback));
 
     ////////////////
@@ -920,10 +942,11 @@ int8_t UART_UnregisterRxTriggerCallback (UART_HandleT handle)
     }
 }
 
+#if UART_RX_CALLBACK_COUNT
 /*!
 *******************************************************************************
 ** \brief   Register a callback function that is executed on the reception of
-**          a specific character. 
+**          a specific character.
 **
 **          The registered callback function will be executed every time
 **          when the specified character arrives on the rx input.
@@ -931,7 +954,7 @@ int8_t UART_UnregisterRxTriggerCallback (UART_HandleT handle)
 **          the callback will only execute if it has been registered
 **          with #execOnRxWait as 1.
 **          The callback must accept a void pointer as optional argument
-**          and must be robust for this argument pointer to be NULL in case 
+**          and must be robust for this argument pointer to be NULL in case
 **          that the optArgPtr argument is NULL.
 **
 ** \attention
@@ -953,9 +976,9 @@ int8_t UART_UnregisterRxTriggerCallback (UART_HandleT handle)
 **
 *******************************************************************************
 */
-int8_t UART_RegisterRxCallback (UART_HandleT handle, 
+int8_t UART_RegisterRxCallback (UART_HandleT handle,
                                 uint8_t rxByte,
-                                void (*funcPtr)(void* optArgPtr), 
+                                void (*funcPtr)(void* optArgPtr),
                                 void* optArgPtr,
                                 UART_RxCallbackOptionsT options)
 {
@@ -1007,7 +1030,7 @@ int8_t UART_RegisterRxCallback (UART_HandleT handle,
 *******************************************************************************
 ** \brief   Unregister a previously registered rx callback function.
 **
-**          All rx callbacks that have been registered with the #rxByte 
+**          All rx callbacks that have been registered with the #rxByte
 **          argument will be unregistered.
 **
 ** \param   handle  A handle associated with a specific AVR hardware UART.
@@ -1071,13 +1094,13 @@ int8_t UART_UnregisterRxCallback (UART_HandleT handle, uint8_t rxByte)
 **          scanf it is recommended to set the execOnRxWait option to 0,
 **          since scanf will empty the buffer causing this callback not
 **          to take effect.
-**          The optArgPtr must contain the addressed UART's handle. 
+**          The optArgPtr must contain the addressed UART's handle.
 **          Register this function the following way in your application:
 ** \code
 **          UART_RxCallbackOptionsT options;
 **          options.execOnRxWait = 0;
 **          options.writeRxToBuffer = 0;
-**          UART_RegisterRxCallback(0x08, UART_RxCallbackOnBackspace, 
+**          UART_RegisterRxCallback(0x08, UART_RxCallbackOnBackspace,
 **                                  uartHandle, options);
 ** \endcode
 **
@@ -1093,6 +1116,7 @@ void UART_RxCallbackOnBackspace (void* optArgPtr)
     (void)BUFFER_ReadByteFromTail(&handlePtr->rxBuffer, NULL);
     return;
 }
+#endif // UART_RX_CALLBACK_COUNT
 
 /*!
 *******************************************************************************
@@ -1221,7 +1245,7 @@ uint8_t UART_RxByte (UART_HandleT handle)
 ** \return  The number of bytes that have actually been written to the
 **          tx buffer. This value may be less than the passed byteCount if
 **          the tx buffer was not able to store byteCount values. If the
-**          tx buffer is full, 0 is returned.
+**          tx buffer is full, the function returns with 0.
 **
 *******************************************************************************
 */
@@ -1272,7 +1296,7 @@ uint8_t UART_TxField (UART_HandleT handle, uint8_t* fieldPtr, uint8_t byteCount)
 ** \return  The number of bytes that have actually been read from the
 **          rx buffer. This value may be less than the passed byteCount if
 **          the rx buffer did not contain byteCount values. If the receive
-**          buffer was empty, 0 is returned.
+**          buffer was empty, the function returns with 0.
 **
 *******************************************************************************
 */

@@ -42,14 +42,16 @@
 #define UART_RX_CALLBACK_COUNT  3
 #endif
 
-//! Set to 1 if UART functions should be called from within ISRs.
+//! Set to 1 if UART functions will be called from within other ISRs.
 #ifndef UART_INTERRUPT_SAFETY
 #define UART_INTERRUPT_SAFETY   1
 #endif
 
-//! Set to 1 to enable nested interrupts within rx callback functions. 
+/*! Set to 1 to enable nested interrupts within rx callback functions.
+**  This setting is NOT recommended and may lead to race conditions.
+**  Make sure that you know ALL implications before you enable this! */
 #ifndef UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
-#define UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS   1
+#define UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS   0
 #endif
 
 //! CPU frequency
@@ -84,6 +86,7 @@
 /*! UART handle, which corresponds to a particular UART port. */
 typedef void* UART_HandleT;
 
+/*! UART port identifier for devices with multiple UART ports. */
 typedef enum
 {
     UART_InterfaceId0 = 0,
@@ -179,18 +182,21 @@ UART_HandleT UART_Init (UART_InterfaceIdT id,
                         UART_LedParamsT*  ledParamsPtr);
 int8_t  UART_IsInitialized(UART_HandleT handle);
 int8_t  UART_RegisterRxTriggerCallback(UART_HandleT handle,
-                                       void (*funcPtr)(void* optArgPtr, 
-                                                       uint8_t rxByte), 
+                                       void (*funcPtr)(void* optArgPtr,
+                                                       uint8_t rxByte),
                                        void* optArgPtr,
                                        UART_RxCallbackOptionsT options);
 int8_t  UART_UnregisterRxTriggerCallback(UART_HandleT handle);
-int8_t  UART_RegisterRxCallback(UART_HandleT handle, 
+
+#if UART_RX_CALLBACK_COUNT
+int8_t  UART_RegisterRxCallback(UART_HandleT handle,
                                 uint8_t rxByte,
-                                void (*funcPtr)(void* optArgPtr), 
+                                void (*funcPtr)(void* optArgPtr),
                                 void* optArgPtr,
                                 UART_RxCallbackOptionsT options);
 int8_t  UART_UnregisterRxCallback(UART_HandleT handle, uint8_t rxByte);
-void    UART_RxCallbackOnBackspace(void* optArgPtr); 
+void    UART_RxCallbackOnBackspace(void* optArgPtr);
+#endif // UART_RX_CALLBACK_COUNT
 
 void    UART_TxByte(UART_HandleT handle, uint8_t byte);
 uint8_t UART_RxByte(UART_HandleT handle);
