@@ -22,9 +22,24 @@
 //*************************** DEFINES AND MACROS ******************************
 //*****************************************************************************
 
+//! CPU clock frequency
+#ifndef F_CPU
+#define F_CPU                       18432000
+#endif
+
 //! Set to 1 if TIMER functions will be called from within ISRs.
 #ifndef TIMER_INTERRUPT_SAFETY
 #define TIMER_INTERRUPT_SAFETY      0
+#endif
+
+//! Switch to enable the countdown feature (requires additional 60 bytes in RAM).
+#ifndef TIMER_ENABLE_COUNTDOWN
+#define TIMER_ENABLE_COUNTDOWN      1
+#endif
+
+//! A smaller value increases timer precision at the cost of generated interrupts.
+#ifndef TIMER_COUNTDOWN_IMPRECISION
+#define TIMER_COUNTDOWN_IMPRECISION 0
 #endif
 
 
@@ -44,6 +59,8 @@
 /*! A bad handle has been passed. */
 #define TIMER_ERR_BAD_HANDLE        TIMER_ERR_BASE - 2
 
+/*! The set up wave generation mode is not suited for the operation. */
+#define TIMER_ERR_INCOMPATIBLE_WGM  TIMER_ERR_BASE - 3
 
 //*****************************************************************************
 //******************************** DATA TYPES *********************************
@@ -105,6 +122,7 @@ TIMER_StopT;
 /*! TIMER callback function. */
 typedef void (*TIMER_CallbackT) (void* optArgPtr);
 
+
 //*****************************************************************************
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
@@ -136,6 +154,14 @@ int8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
 
 int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
                                 TIMER_ClockPrescalerT clockPrescaler);
+
+#if TIMER_ENABLE_COUNTDOWN
+int8_t TIMER_StartCountdown (TIMER_HandleT handle,
+                             TIMER_CallbackT callbackPtr,
+                             void* optArgPtr,
+                             uint16_t timeMs,
+                             uint16_t numberOfExecutions);
+#endif // TIMER_ENABLE_COUNTDOWN
 
 #endif
 
