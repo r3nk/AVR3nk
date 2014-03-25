@@ -147,7 +147,6 @@ static int8_t timerSetPinsAsOutputs (timerHandleT* handlePtr);
 static int8_t timerSetPinsAsInputs (timerHandleT* handlePtr);
 static inline void timerStopClock (timerHandleT* handlePtr);
 static inline void timerResetTimerRegister (timerHandleT* handlePtr);
-static uint16_t timerGetPrescalerValue (TIMER_ClockPrescalerT prescaler);
 #if TIMER_ENABLE_COUNTDOWN
 static void   timerNextSmallerPrescaler (uint32_t cycles,
                                          uint16_t* prescalerValue,
@@ -598,8 +597,8 @@ static inline void timerResetTimerRegister (timerHandleT* handlePtr)
         timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
                         *handlePtr->tcnt.uint8Ptr :
                         *handlePtr->tcnt.uint16Ptr;
-        handlePtr->stopwatchCycles += \
-            timer_value * timerGetPrescalerValue(handlePtr->clockPrescaler);
+        handlePtr->stopwatchCycles += timer_value * \
+            TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler);
     }
 
     if (handlePtr->bitWidth == timerBitWidth_8)
@@ -611,37 +610,6 @@ static inline void timerResetTimerRegister (timerHandleT* handlePtr)
         *handlePtr->tcnt.uint16Ptr = 0;
     }
     return;
-}
-
-/*!
-*******************************************************************************
-** \brief   Return the corresponding numeric value of a given prescaler type.
-**
-** \param   prescaler       A prescaler type.
-**
-*******************************************************************************
-*/
-static uint16_t timerGetPrescalerValue (TIMER_ClockPrescalerT prescaler)
-{
-    switch(prescaler)
-    {
-        case TIMER_ClockPrescaler_1:
-            return 1;
-        case TIMER_ClockPrescaler_8:
-            return 8;
-        case TIMER_ClockPrescaler_32:
-            return 32;
-        case TIMER_ClockPrescaler_64:
-            return 64;
-        case TIMER_ClockPrescaler_128:
-            return 128;
-        case TIMER_ClockPrescaler_256:
-            return 256;
-        case TIMER_ClockPrescaler_1024:
-            return 1024;
-        default:
-            return 0;
-    }
 }
 
 #if TIMER_ENABLE_COUNTDOWN
@@ -842,7 +810,7 @@ static void timerOverflowHandler (timerHandleT* handlePtr)
     if (handlePtr->timerState == timerStateOneShot)
     {
         // Stop the timer:
-        timerStopClock(handlePtr);
+        //timerStopClock(handlePtr); // already done directly in the ISRs
         // Reset the timer register in case it already incremented:
         timerResetTimerRegister(handlePtr);
         // Clear the interrupt flags:
@@ -856,7 +824,7 @@ static void timerOverflowHandler (timerHandleT* handlePtr)
     {
         handlePtr->stopwatchCycles += \
             ((handlePtr->bitWidth == timerBitWidth_8) ? 0x100UL : 0x10000UL) * \
-            timerGetPrescalerValue(handlePtr->clockPrescaler);
+            TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler);
     }
 #if TIMER_ENABLE_COUNTDOWN
     if (handlePtr->timerState == timerStateCountdown)
@@ -1231,6 +1199,12 @@ int8_t TIMER_Start (TIMER_HandleT handle)
 **          will have the same effect as
 **          TIMER_Stop(handlePtr, TIMER_Stop_OnOverflow).
 **
+** \attention
+**          As the timer is stopped in the ISR by software, the timer will run
+**          for approximately 50 additional system clock cycles. Hence, if it
+**          is required that the timer register does not increment from 0 to 1
+**          after the oneshot, the clock prescaler must be 64 or greater.
+**
 ** \param   handle  The timer handle of the timer to start.
 **
 ** \return
@@ -1574,6 +1548,40 @@ int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
     return (TIMER_OK);
 }
 
+/*!
+*******************************************************************************
+** \brief   Return the corresponding numeric value of a given prescaler type.
+**
+** \param   prescaler       A prescaler type.
+**
+** \return  - The corresponding numeric prescaler value.
+**          - 0 if the given argument is invalid.
+**
+*******************************************************************************
+*/
+uint16_t TIMER_GetClockPrescalerValue (TIMER_ClockPrescalerT prescaler)
+{
+    switch(prescaler)
+    {
+        case TIMER_ClockPrescaler_1:
+            return 1;
+        case TIMER_ClockPrescaler_8:
+            return 8;
+        case TIMER_ClockPrescaler_32:
+            return 32;
+        case TIMER_ClockPrescaler_64:
+            return 64;
+        case TIMER_ClockPrescaler_128:
+            return 128;
+        case TIMER_ClockPrescaler_256:
+            return 256;
+        case TIMER_ClockPrescaler_1024:
+            return 1024;
+        default:
+            return 0;
+    }
+}
+
 #if TIMER_ENABLE_COUNTDOWN
 /*!
 *******************************************************************************
@@ -1738,7 +1746,7 @@ int8_t TIMER_ResetStopwatch (TIMER_HandleT handle,
 ** \attention
 **          The stopwatch internally uses a 32-bit variable to count system
 **          clock cycles. It will overflow after (UINT32_MAX+1 / F_CPU)
-**          seconds without any warnings or errors.
+**          seconds without any warning or error.
 **
 ** \param   handle              A valid timer handle.
 ** \param   clockCycles         Will receive the number of counted system
@@ -1773,7 +1781,7 @@ int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
                         *handlePtr->tcnt.uint8Ptr :
                         *handlePtr->tcnt.uint16Ptr;
         *clockCycles = handlePtr->stopwatchCycles + \
-           (timer_value * timerGetPrescalerValue(handlePtr->clockPrescaler));
+           (timer_value * TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler));
 
         // Enable output compare interrupt:
         if (timerIsOutputCompareMatchHandlerActive (handlePtr))
@@ -1837,7 +1845,7 @@ int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
                         *handlePtr->tcnt.uint8Ptr :
                         *handlePtr->tcnt.uint16Ptr;
         total_cycles = handlePtr->stopwatchCycles + \
-           (timer_value * timerGetPrescalerValue(handlePtr->clockPrescaler));
+           (timer_value * TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler));
         *timeMs = total_cycles / (F_CPU / 1000UL);
 
         // Enable output compare interrupt:
@@ -1873,6 +1881,11 @@ int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
 */
 ISR (TIMER0_OVF_vect, ISR_BLOCK)
 {
+    // In oneshot mode, stop the timer as early as possible:
+    if (timerHandleArr[0].timerState == timerStateOneShot)
+    {
+        TCCR0B &= ~( (1 << CS02) | (1 << CS01) | (1 << CS00) );
+    }
     timerOverflowHandler(&timerHandleArr[0]);
     return;
 }
@@ -1887,6 +1900,11 @@ ISR (TIMER0_OVF_vect, ISR_BLOCK)
 */
 ISR (TIMER1_OVF_vect, ISR_BLOCK)
 {
+    // In oneshot mode, stop the timer as early as possible:
+    if (timerHandleArr[1].timerState == timerStateOneShot)
+    {
+        TCCR1B &= ~( (1 << CS12) | (1 << CS11) | (1 << CS10) );
+    }
     timerOverflowHandler(&timerHandleArr[1]);
     return;
 }
@@ -1901,6 +1919,11 @@ ISR (TIMER1_OVF_vect, ISR_BLOCK)
 */
 ISR (TIMER2_OVF_vect, ISR_BLOCK)
 {
+    // In oneshot mode, stop the timer as early as possible:
+    if (timerHandleArr[2].timerState == timerStateOneShot)
+    {
+        TCCR2B &= ~( (1 << CS22) | (1 << CS21) | (1 << CS20) );
+    }
     timerOverflowHandler(&timerHandleArr[2]);
     return;
 }

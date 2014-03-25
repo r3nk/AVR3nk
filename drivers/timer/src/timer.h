@@ -164,6 +164,8 @@ int8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
 int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
                                 TIMER_ClockPrescalerT clockPrescaler);
 
+uint16_t TIMER_GetClockPrescalerValue (TIMER_ClockPrescalerT prescaler);
+
 #if TIMER_ENABLE_COUNTDOWN
 int8_t TIMER_StartCountdown (TIMER_HandleT handle,
                              TIMER_CallbackT callbackPtr,
