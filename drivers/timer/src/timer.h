@@ -48,19 +48,20 @@
 //*****************************************************************************
 
 /*! TIMER specific error base */
-#define TIMER_ERR_BASE              0
+#define TIMER_ERR_BASE                      0
 
 /*! TIMER returns with no errors. */
-#define TIMER_OK                    0
+#define TIMER_OK                            0
 
 /*! A bad parameter has been passed. */
-#define TIMER_ERR_BAD_PARAMETER     TIMER_ERR_BASE - 1
+#define TIMER_ERR_BAD_PARAMETER             TIMER_ERR_BASE - 1
 
 /*! A bad handle has been passed. */
-#define TIMER_ERR_BAD_HANDLE        TIMER_ERR_BASE - 2
+#define TIMER_ERR_BAD_HANDLE                TIMER_ERR_BASE - 2
 
 /*! The set up wave generation mode is not suited for the operation. */
-#define TIMER_ERR_INCOMPATIBLE_WGM  TIMER_ERR_BASE - 3
+#define TIMER_ERR_INCOMPATIBLE_WGM          TIMER_ERR_BASE - 3
+
 
 //*****************************************************************************
 //******************************** DATA TYPES *********************************
@@ -111,6 +112,7 @@ typedef enum
     TIMER_OutputMode_SetOnCompareMatch_InvertingPWM
 } TIMER_OutputModeT;
 
+/*! These modes define how the timer stops counting. */
 typedef enum
 {
     TIMER_Stop_OnOverflow = 0,
@@ -121,6 +123,13 @@ TIMER_StopT;
 
 /*! TIMER callback function. */
 typedef void (*TIMER_CallbackT) (void* optArgPtr);
+
+/*! Defines whether the timer keeps track of elapsed system clock cycles. */
+typedef enum
+{
+    TIMER_Stopwatch_Off = 0,
+    TIMER_Stopwatch_On
+} TIMER_StopwatchEnableT;
 
 
 //*****************************************************************************
@@ -162,6 +171,15 @@ int8_t TIMER_StartCountdown (TIMER_HandleT handle,
                              uint16_t timeMs,
                              uint16_t numberOfExecutions);
 #endif // TIMER_ENABLE_COUNTDOWN
+
+int8_t TIMER_ResetStopwatch (TIMER_HandleT handle,
+                             TIMER_StopwatchEnableT stopwatchEnable);
+
+int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
+                                            uint32_t* clockCycles);
+
+int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
+                                 uint32_t* timeMs);
 
 #endif
 
