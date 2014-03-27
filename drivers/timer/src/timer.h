@@ -37,9 +37,9 @@
 #define TIMER_ENABLE_COUNTDOWN      1
 #endif
 
-//! A smaller value increases timer precision at the cost of generated interrupts.
+//! A smaller value increases countdown precision at the cost of generated interrupts.
 #ifndef TIMER_COUNTDOWN_IMPRECISION
-#define TIMER_COUNTDOWN_IMPRECISION 0
+#define TIMER_COUNTDOWN_IMPRECISION 256
 #endif
 
 

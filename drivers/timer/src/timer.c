@@ -764,12 +764,13 @@ static void timerSetCountdownForRemainingCycles (timerHandleT* handlePtr)
 */
 static inline void timerCountdownCallback (timerHandleT* handlePtr)
 {
+    // Update execution count:
+    if (handlePtr->countdownRemainingExecutions < UINT16_MAX)
+    {
+        handlePtr->countdownRemainingExecutions--;
+    }
     if (handlePtr->countdownRemainingExecutions)
     {
-        if (handlePtr->countdownRemainingExecutions < UINT16_MAX)
-        {
-            handlePtr->countdownRemainingExecutions--;
-        }
         // Restart the countdown:
         handlePtr->countdownRemainingCycles = handlePtr->countdownTotalCycles;
         timerSetCountdownForRemainingCycles(handlePtr);
@@ -1640,6 +1641,13 @@ int8_t TIMER_StartCountdown (TIMER_HandleT handle,
         if (handlePtr->waveGenerationMode != TIMER_WaveGeneration_NormalMode)
         {
             return (TIMER_ERR_INCOMPATIBLE_WGM);
+        }
+
+        // In case of no delay, execute immediately:
+        if (timeMs == 0)
+        {
+            callbackPtr(callbackArgPtr);
+            return (TIMER_OK);
         }
 
         ////////////////////////////////////////////////
