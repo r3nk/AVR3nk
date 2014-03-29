@@ -226,11 +226,11 @@ static void cmdlDumpCmdString(void)
 **
 *******************************************************************************
 */
-int8_t CMDL_Init(UART_HandleT uartHandle,
-                 UART_RxCallbackT cmdlExecTriggerPtr,
-                 CMDL_OptionsT options)
+uint8_t CMDL_Init(UART_HandleT uartHandle,
+                  UART_RxCallbackT cmdlExecTriggerPtr,
+                  CMDL_OptionsT options)
 {
-    int8_t ret_code;
+    uint8_t ret_code;
     UART_RxCallbackOptionsT callbackOptions;
 
     if(UART_IsInitialized(uartHandle) == 0)
@@ -302,7 +302,7 @@ int8_t CMDL_Init(UART_HandleT uartHandle,
 **
 *******************************************************************************
 */
-int8_t CMDL_IsInitialized(void)
+uint8_t CMDL_IsInitialized(void)
 {
     return(cmdlState.initialized);
 }
@@ -332,12 +332,12 @@ int8_t CMDL_IsInitialized(void)
 *******************************************************************************
 */
 #if CMDL_USAGE_STRING_SUPPORT
-int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
-                            char* namePtr,
-                            char* usagePtr)
+uint8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
+                             char* namePtr,
+                             char* usagePtr)
 #else //CMDL_USAGE_STRING_SUPPORT
-int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
-                            char* namePtr)
+uint8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
+                             char* namePtr)
 #endif // CMDL_USAGE_STRING_SUPPORT
 {
     uint8_t ii;

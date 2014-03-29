@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -64,19 +64,21 @@
 //*****************************************************************************
 
 /*! UART specific error base */
-#define UART_ERR_BASE               0
+#ifndef UART_ERR_BASE
+#define UART_ERR_BASE               20
+#endif
 
 /*! UART returns with no errors. */
 #define UART_OK                     0
 
 /*! A bad parameter has been passed. */
-#define UART_ERR_BAD_PARAMETER      UART_ERR_BASE - 1
+#define UART_ERR_BAD_PARAMETER      UART_ERR_BASE + 0
 
 /*! There is no callback slot free. */
-#define UART_ERR_NO_CALLBACK_SLOT   UART_ERR_BASE - 2
+#define UART_ERR_NO_CALLBACK_SLOT   UART_ERR_BASE + 1
 
 /*! The callback function has not been found. */
-#define UART_ERR_CALLBACK_NOT_FOUND UART_ERR_BASE - 3
+#define UART_ERR_CALLBACK_NOT_FOUND UART_ERR_BASE + 2
 
 
 //*****************************************************************************
@@ -186,20 +188,20 @@ UART_HandleT UART_Init (UART_InterfaceIdT id,
                         UART_CharSizeT    charSizeMode,
                         UART_TransceiveT  transceiveMode,
                         UART_LedParamsT*  ledParamsPtr);
-int8_t  UART_IsInitialized(UART_HandleT handle);
-int8_t  UART_RegisterRxTriggerCallback(UART_HandleT handle,
+uint8_t UART_IsInitialized(UART_HandleT handle);
+uint8_t UART_RegisterRxTriggerCallback(UART_HandleT handle,
                                        UART_RxTriggerCallbackT funcPtr,
                                        void* optArgPtr,
                                        UART_RxCallbackOptionsT options);
-int8_t  UART_UnregisterRxTriggerCallback(UART_HandleT handle);
+uint8_t UART_UnregisterRxTriggerCallback(UART_HandleT handle);
 
 #if UART_RX_CALLBACK_COUNT
-int8_t  UART_RegisterRxCallback(UART_HandleT handle,
+uint8_t UART_RegisterRxCallback(UART_HandleT handle,
                                 uint8_t rxByte,
                                 UART_RxCallbackT funcPtr,
                                 void* optArgPtr,
                                 UART_RxCallbackOptionsT options);
-int8_t  UART_UnregisterRxCallback(UART_HandleT handle, uint8_t rxByte);
+uint8_t UART_UnregisterRxCallback(UART_HandleT handle, uint8_t rxByte);
 void    UART_RxCallbackOnBackspace(void* optArgPtr);
 #endif // UART_RX_CALLBACK_COUNT
 

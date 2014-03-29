@@ -147,14 +147,14 @@ static timerHandleT timerHandleArr[TIMER_NUMBER_OF_TIMERS];
 //********************** LOCAL FUNCTION DECLARATIONS **************************
 //*****************************************************************************
 
-static void   timerResetRegisters (timerHandleT* handlePtr);
-static int8_t timerSetCompareOutputMode (timerHandleT* handlePtr);
-static int8_t timerSetWaveGenerationMode (timerHandleT* handlePtr);
-static int8_t timerCheckClockPrescaler (timerHandleT* handlePtr,
-                                        TIMER_ClockPrescalerT clockPrescaler);
-static int8_t timerStartClock (timerHandleT* handlePtr);
-static int8_t timerSetPinsAsOutputs (timerHandleT* handlePtr);
-static int8_t timerSetPinsAsInputs (timerHandleT* handlePtr);
+static void    timerResetRegisters (timerHandleT* handlePtr);
+static uint8_t timerSetCompareOutputMode (timerHandleT* handlePtr);
+static uint8_t timerSetWaveGenerationMode (timerHandleT* handlePtr);
+static uint8_t timerCheckClockPrescaler (timerHandleT* handlePtr,
+                                         TIMER_ClockPrescalerT clockPrescaler);
+static uint8_t timerStartClock (timerHandleT* handlePtr);
+static uint8_t timerSetPinsAsOutputs (timerHandleT* handlePtr);
+static uint8_t timerSetPinsAsInputs (timerHandleT* handlePtr);
 static inline void timerStopClock (timerHandleT* handlePtr);
 static inline void timerResetTimerRegister (timerHandleT* handlePtr);
 static inline void timerSetOcraRegister (timerHandleT* handlePtr, uint16_t value);
@@ -211,13 +211,13 @@ static void timerResetRegisters (timerHandleT* handlePtr)
 **                      It also contains the output compare modes to set up.
 **
 ** \return
+**          - #TIMER_OK on success.
 **          - #TIMER_ERR_BAD_HANDLE if the handle is in a bad state.
 **          - #TIMER_ERR_BAD_PARAMETER if an unsupported mode is to be set up.
-**          - #TIMER_OK on success.
 **
 *******************************************************************************
 */
-static int8_t timerSetCompareOutputMode (timerHandleT* handlePtr)
+static uint8_t timerSetCompareOutputMode (timerHandleT* handlePtr)
 {
     switch (handlePtr->outputModeA)
     {
@@ -271,12 +271,12 @@ static int8_t timerSetCompareOutputMode (timerHandleT* handlePtr)
 **                              to set up.
 **
 ** \return
-**          - #TIMER_ERR_BAD_PARAMETER if a bad parameter is provided.
 **          - #TIMER_OK on success.
+**          - #TIMER_ERR_BAD_PARAMETER if a bad parameter is provided.
 **
 *******************************************************************************
 */
-static int8_t timerSetWaveGenerationMode (timerHandleT* handlePtr)
+static uint8_t timerSetWaveGenerationMode (timerHandleT* handlePtr)
 {
     if ((handlePtr->timerId == TIMER_TimerId_0)
     ||  (handlePtr->timerId == TIMER_TimerId_2))
@@ -351,14 +351,14 @@ static int8_t timerSetWaveGenerationMode (timerHandleT* handlePtr)
 ** \param   clockPrescaler  The clock prescaler to check.
 **
 ** \return
+**          - #TIMER_OK if the clock prescaler is supported by the timer.
 **          - #TIMER_ERR_BAD_PARAMETER if the clock prescaler is not supported
 **              by the timer.
-**          - #TIMER_OK if the clock prescaler is supported by the timer.
 **
 *******************************************************************************
 */
-static int8_t timerCheckClockPrescaler (timerHandleT* handlePtr,
-                                        TIMER_ClockPrescalerT clockPrescaler)
+static uint8_t timerCheckClockPrescaler (timerHandleT* handlePtr,
+                                         TIMER_ClockPrescalerT clockPrescaler)
 {
     if ((handlePtr->timerId == TIMER_TimerId_0)
     ||  (handlePtr->timerId == TIMER_TimerId_1))
@@ -407,12 +407,12 @@ static int8_t timerCheckClockPrescaler (timerHandleT* handlePtr,
 **                          It also contains the clock prescaler to set up.
 **
 ** \return
-**          - #TIMER_ERR_BAD_HANDLE if the handle is in a bad state.
 **          - #TIMER_OK on success.
+**          - #TIMER_ERR_BAD_HANDLE if the handle is in a bad state.
 **
 *******************************************************************************
 */
-static int8_t timerStartClock (timerHandleT* handlePtr)
+static uint8_t timerStartClock (timerHandleT* handlePtr)
 {
     if ((handlePtr->timerId == TIMER_TimerId_0)
     ||  (handlePtr->timerId == TIMER_TimerId_1))
@@ -479,12 +479,12 @@ static int8_t timerStartClock (timerHandleT* handlePtr)
 ** \param   handlePtr   The handle must be checked by the caller.
 **
 ** \return
-**          - #TIMER_ERR_BAD_HANDLE if the handle is in a bad state.
 **          - #TIMER_OK on success.
+**          - #TIMER_ERR_BAD_HANDLE if the handle is in a bad state.
 **
 *******************************************************************************
 */
-static int8_t timerSetPinsAsOutputs (timerHandleT* handlePtr)
+static uint8_t timerSetPinsAsOutputs (timerHandleT* handlePtr)
 {
     switch(handlePtr->timerId)
     {
@@ -531,12 +531,12 @@ static int8_t timerSetPinsAsOutputs (timerHandleT* handlePtr)
 ** \param   handlePtr   The handle must be checked by the caller.
 **
 ** \return
-**          - #TIMER_ERR_BAD_HANDLE if the handle is in a bad state.
 **          - #TIMER_OK on success.
+**          - #TIMER_ERR_BAD_HANDLE if the handle is in a bad state.
 **
 *******************************************************************************
 */
-static int8_t timerSetPinsAsInputs (timerHandleT* handlePtr)
+static uint8_t timerSetPinsAsInputs (timerHandleT* handlePtr)
 {
     switch(handlePtr->timerId)
     {
@@ -1057,7 +1057,7 @@ TIMER_HandleT TIMER_Init (TIMER_TimerIdT          timerId,
                           TIMER_OutputModeT       outputModeA,
                           TIMER_OutputModeT       outputModeB)
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     timerHandleT* handlePtr = NULL;
     jmp_buf env;
 
@@ -1130,7 +1130,7 @@ TIMER_HandleT TIMER_Init (TIMER_TimerIdT          timerId,
     timerResetRegisters (handlePtr);
 
     // Reset registers if any errors occur:
-    result = setjmp(env);
+    result = (uint8_t)setjmp(env);
     if (result)
     {
         timerResetRegisters (handlePtr);
@@ -1140,20 +1140,20 @@ TIMER_HandleT TIMER_Init (TIMER_TimerIdT          timerId,
 
     // Set up compare output mode:
     result = timerSetCompareOutputMode (handlePtr);
-    if (result) longjmp (env, result);
+    if (result) longjmp (env, (int8_t)result);
 
     // Set up wave generation mode:
     result = timerSetWaveGenerationMode (handlePtr);
-    if (result) longjmp (env, result);
+    if (result) longjmp (env, (int8_t)result);
 
     // Check if the clock prescaler is supported by the timer:
     result = timerCheckClockPrescaler (handlePtr, clockPrescaler);
-    if (result) longjmp (env, result);
+    if (result) longjmp (env, (int8_t)result);
 
     // Set PWM pins as outputs:
     // Set up DDR registers after compare output mode, according to ATmega644p 12.5.3
     result = timerSetPinsAsOutputs (handlePtr);
-    if (result) longjmp (env, result);
+    if (result) longjmp (env, (int8_t)result);
 
     return (TIMER_HandleT)handlePtr;
 }
@@ -1170,7 +1170,7 @@ TIMER_HandleT TIMER_Init (TIMER_TimerIdT          timerId,
 **
 *******************************************************************************
 */
-int8_t TIMER_IsInitialized (TIMER_HandleT handle)
+uint8_t TIMER_IsInitialized (TIMER_HandleT handle)
 {
     uint8_t initialized = 0;
 
@@ -1203,7 +1203,7 @@ int8_t TIMER_IsInitialized (TIMER_HandleT handle)
 **
 *******************************************************************************
 */
-int8_t TIMER_Exit (TIMER_HandleT handle)
+uint8_t TIMER_Exit (TIMER_HandleT handle)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1245,7 +1245,7 @@ int8_t TIMER_Exit (TIMER_HandleT handle)
 **
 *******************************************************************************
 */
-int8_t TIMER_Start (TIMER_HandleT handle)
+uint8_t TIMER_Start (TIMER_HandleT handle)
 {
     int8_t result = 0;
     uint8_t timsk = 0;
@@ -1310,7 +1310,7 @@ int8_t TIMER_Start (TIMER_HandleT handle)
 **
 *******************************************************************************
 */
-int8_t TIMER_OneShot (TIMER_HandleT handle)
+uint8_t TIMER_OneShot (TIMER_HandleT handle)
 {
     int8_t result = 0;
     uint8_t timsk = 0;
@@ -1383,7 +1383,7 @@ int8_t TIMER_OneShot (TIMER_HandleT handle)
 **
 *******************************************************************************
 */
-int8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode)
+uint8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1464,10 +1464,10 @@ int8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode)
 **
 *******************************************************************************
 */
-int8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
-                                  TIMER_CallbackT callbackPtr,
-                                  void* callbackArgPtr,
-                                  uint16_t callbackPeriod)
+uint8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
+                                   TIMER_CallbackT callbackPtr,
+                                   void* callbackArgPtr,
+                                   uint16_t callbackPeriod)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1543,9 +1543,9 @@ int8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
-                                        uint16_t outputCompareA,
-                                        uint16_t outputCompareB)
+uint8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
+                                         uint16_t outputCompareA,
+                                         uint16_t outputCompareB)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1612,10 +1612,10 @@ int8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
-                                TIMER_ClockPrescalerT clockPrescaler)
+uint8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
+                                 TIMER_ClockPrescalerT clockPrescaler)
 {
-    int8_t result = 0;
+    uint8_t result = 0;
 
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1739,11 +1739,11 @@ uint16_t TIMER_GetClockPrescalerValue (TIMER_ClockPrescalerT prescaler)
 **
 *******************************************************************************
 */
-int8_t TIMER_StartCountdown (TIMER_HandleT handle,
-                             TIMER_CallbackT callbackPtr,
-                             void* callbackArgPtr,
-                             uint16_t timeMs,
-                             uint16_t numberOfExecutions)
+uint8_t TIMER_StartCountdown (TIMER_HandleT handle,
+                              TIMER_CallbackT callbackPtr,
+                              void* callbackArgPtr,
+                              uint16_t timeMs,
+                              uint16_t numberOfExecutions)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1828,8 +1828,8 @@ int8_t TIMER_StartCountdown (TIMER_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t TIMER_EnableDisableStopwatch (TIMER_HandleT handle,
-                                     TIMER_StopwatchEnableDisableT enableDisable)
+uint8_t TIMER_EnableDisableStopwatch (TIMER_HandleT handle,
+                                      TIMER_StopwatchEnableDisableT enableDisable)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1919,9 +1919,9 @@ int8_t TIMER_EnableDisableStopwatch (TIMER_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
-                                            uint32_t* clockCycles,
-                                            TIMER_StopwatchResetT stopwatchReset)
+uint8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
+                                             uint32_t* clockCycles,
+                                             TIMER_StopwatchResetT stopwatchReset)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1996,9 +1996,9 @@ int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
-                                 uint32_t* timeMs,
-                                 TIMER_StopwatchResetT stopwatchReset)
+uint8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
+                                  uint32_t* timeMs,
+                                  TIMER_StopwatchResetT stopwatchReset)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -2087,10 +2087,10 @@ int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t TIMER_SetStopwatchTimeCallback(TIMER_HandleT handle,
-                                      TIMER_CallbackT callbackPtr,
-                                      void* callbackArgPtr,
-                                      uint32_t clockCycles)
+uint8_t TIMER_SetStopwatchTimeCallback(TIMER_HandleT handle,
+                                       TIMER_CallbackT callbackPtr,
+                                       void* callbackArgPtr,
+                                       uint32_t clockCycles)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)

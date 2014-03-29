@@ -7,7 +7,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -67,9 +67,9 @@ static SPI_S_CallbackT spisCallback;
 **
 *******************************************************************************
 */
-int8_t SPI_S_Init (SPI_DataOrderT dataOrder,
-                   SPI_ClockPolarityT clockParity,
-                   SPI_ClockPhaseT clockPhase)
+uint8_t SPI_S_Init (SPI_DataOrderT dataOrder,
+                    SPI_ClockPolarityT clockParity,
+                    SPI_ClockPhaseT clockPhase)
 {
     uint8_t accu = 0;
     uint8_t spi_sreg = SREG;
@@ -138,7 +138,7 @@ int8_t SPI_S_Init (SPI_DataOrderT dataOrder,
 **
 *******************************************************************************
 */
-int8_t SPI_S_IsInitialized (void)
+uint8_t SPI_S_IsInitialized (void)
 {
     return(spisState.initialized);
 }

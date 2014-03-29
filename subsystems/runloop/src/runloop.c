@@ -540,13 +540,13 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 **
 *******************************************************************************
 */
-int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
-                     TIMER_ClockPrescalerT timerClockPrescaler,
-                     UART_HandleT uartHandle,
-                     RUNLOOP_TaskErrorCallbackT taskErrorCallback,
-                     RUNLOOP_SyncErrorCallbackT syncErrorCallback)
+uint8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
+                      TIMER_ClockPrescalerT timerClockPrescaler,
+                      UART_HandleT uartHandle,
+                      RUNLOOP_TaskErrorCallbackT taskErrorCallback,
+                      RUNLOOP_SyncErrorCallbackT syncErrorCallback)
 {
-    int8_t result = 0;
+    uint8_t result = 0;
 
     TIMER_WaveGenerationT wave_generation_mode;
     TIMER_OutputModeT output_mode_A;
@@ -654,12 +654,12 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
 **
 *******************************************************************************
 */
-int8_t RUNLOOP_AddTask (RUNLOOP_TaskCallbackT callbackPtr,
-                        void* callbackArgPtr,
-                        uint16_t numberOfExecutions,
-                        uint32_t periodMs,
-                        uint32_t initialDelayMs,
-                        uint8_t* taskIdPtr)
+uint8_t RUNLOOP_AddTask (RUNLOOP_TaskCallbackT callbackPtr,
+                         void* callbackArgPtr,
+                         uint16_t numberOfExecutions,
+                         uint32_t periodMs,
+                         uint32_t initialDelayMs,
+                         uint8_t* taskIdPtr)
 {
     uint8_t ii = 0;
     runloopTaskT* task_ptr = NULL;
@@ -959,7 +959,7 @@ void RUNLOOP_Stop (void* optArgPtr)
 **
 *******************************************************************************
 */
-int8_t RUNLOOP_GetUptimeClockCycles (uint64_t* systemClockCyclesPtr)
+uint8_t RUNLOOP_GetUptimeClockCycles (uint64_t* systemClockCyclesPtr)
 {
     if (systemClockCyclesPtr == NULL)
     {
@@ -1005,11 +1005,11 @@ int8_t RUNLOOP_GetUptimeClockCycles (uint64_t* systemClockCyclesPtr)
 **
 *******************************************************************************
 */
-int8_t RUNLOOP_GetUptimeHumanReadable (uint16_t* daysPtr,
-                                       uint8_t*  hoursPtr,
-                                       uint8_t*  minutesPtr,
-                                       uint8_t*  secondsPtr,
-                                       uint16_t* millisecondsPtr)
+uint8_t RUNLOOP_GetUptimeHumanReadable (uint16_t* daysPtr,
+                                        uint8_t*  hoursPtr,
+                                        uint8_t*  minutesPtr,
+                                        uint8_t*  secondsPtr,
+                                        uint16_t* millisecondsPtr)
 {
     uint64_t tmp = 0;
 

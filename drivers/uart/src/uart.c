@@ -26,7 +26,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -438,7 +438,7 @@ static void uartIsrRx (uartHandleT* handlePtr)
 
 #if UART_ERROR_HANDLING
     uint8_t status;
-    int8_t  result;
+    uint8_t result;
 #endif // UART_ERROR_HANDLING
 
     rx = *handlePtr->udrPtr;
@@ -825,7 +825,7 @@ UART_HandleT UART_Init (UART_InterfaceIdT id,
 **
 *******************************************************************************
 */
-int8_t UART_IsInitialized (UART_HandleT handle)
+uint8_t UART_IsInitialized (UART_HandleT handle)
 {
     uartHandleT* handlePtr = (uartHandleT*)handle;
 
@@ -859,13 +859,14 @@ int8_t UART_IsInitialized (UART_HandleT handle)
 **
 ** \return
 **          - #UART_OK on success
+**          - #UART_ERR_BAD_PARAMETER if a bad parameter has been passed.
 **
 *******************************************************************************
 */
-int8_t UART_RegisterRxTriggerCallback (UART_HandleT handle,
-                                       UART_RxTriggerCallbackT funcPtr,
-                                       void* optArgPtr,
-                                       UART_RxCallbackOptionsT options)
+uint8_t UART_RegisterRxTriggerCallback (UART_HandleT handle,
+                                        UART_RxTriggerCallbackT funcPtr,
+                                        void* optArgPtr,
+                                        UART_RxCallbackOptionsT options)
 {
     uartHandleT* handlePtr = (uartHandleT*)handle;
 
@@ -908,7 +909,7 @@ int8_t UART_RegisterRxTriggerCallback (UART_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t UART_UnregisterRxTriggerCallback (UART_HandleT handle)
+uint8_t UART_UnregisterRxTriggerCallback (UART_HandleT handle)
 {
     uint8_t found = 0; // indicates if a callback has been registered
     uartHandleT* handlePtr = (uartHandleT*) handle;
@@ -974,11 +975,11 @@ int8_t UART_UnregisterRxTriggerCallback (UART_HandleT handle)
 **
 *******************************************************************************
 */
-int8_t UART_RegisterRxCallback (UART_HandleT handle,
-                                uint8_t rxByte,
-                                UART_RxCallbackT funcPtr,
-                                void* optArgPtr,
-                                UART_RxCallbackOptionsT options)
+uint8_t UART_RegisterRxCallback (UART_HandleT handle,
+                                 uint8_t rxByte,
+                                 UART_RxCallbackT funcPtr,
+                                 void* optArgPtr,
+                                 UART_RxCallbackOptionsT options)
 {
     uint8_t ii;
     uartHandleT* handlePtr = (uartHandleT*) handle;
@@ -1042,7 +1043,7 @@ int8_t UART_RegisterRxCallback (UART_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t UART_UnregisterRxCallback (UART_HandleT handle, uint8_t rxByte)
+uint8_t UART_UnregisterRxCallback (UART_HandleT handle, uint8_t rxByte)
 {
     uint8_t ii; // temporary counter
     uint8_t found = 0; // indicates the count of callbacks found

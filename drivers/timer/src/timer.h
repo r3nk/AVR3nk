@@ -49,25 +49,27 @@
 //*****************************************************************************
 
 /*! TIMER specific error base */
-#define TIMER_ERR_BASE                      0
+#ifndef TIMER_ERR_BASE
+#define TIMER_ERR_BASE                      50
+#endif
 
 /*! TIMER returns with no errors. */
 #define TIMER_OK                            0
 
 /*! A bad parameter has been passed. */
-#define TIMER_ERR_BAD_PARAMETER             TIMER_ERR_BASE - 1
+#define TIMER_ERR_BAD_PARAMETER             TIMER_ERR_BASE + 0
 
 /*! A bad handle has been passed. */
-#define TIMER_ERR_BAD_HANDLE                TIMER_ERR_BASE - 2
+#define TIMER_ERR_BAD_HANDLE                TIMER_ERR_BASE + 1
 
 /*! The set up wave generation mode is not suited for the operation. */
-#define TIMER_ERR_INCOMPATIBLE_WGM          TIMER_ERR_BASE - 3
+#define TIMER_ERR_INCOMPATIBLE_WGM          TIMER_ERR_BASE + 2
 
 /*! The stopwatch is disabled. */
-#define TIMER_ERR_STOPWATCH_DISABLED        TIMER_ERR_BASE - 4
+#define TIMER_ERR_STOPWATCH_DISABLED        TIMER_ERR_BASE + 3
 
 /*! There would be a timer resource conflict if the function was executed. */
-#define TIMER_ERR_RESOURCE_CONFLICT         TIMER_ERR_BASE - 5
+#define TIMER_ERR_RESOURCE_CONFLICT         TIMER_ERR_BASE + 4
 
 
 //*****************************************************************************
@@ -156,53 +158,53 @@ TIMER_HandleT TIMER_Init (TIMER_TimerIdT          timerId,
                           TIMER_OutputModeT       outputModeA,
                           TIMER_OutputModeT       outputModeB);
 
-int8_t TIMER_IsInitialized (TIMER_HandleT handle);
+uint8_t TIMER_IsInitialized (TIMER_HandleT handle);
 
-int8_t TIMER_Exit (TIMER_HandleT handle);
+uint8_t TIMER_Exit (TIMER_HandleT handle);
 
-int8_t TIMER_Start (TIMER_HandleT handle);
+uint8_t TIMER_Start (TIMER_HandleT handle);
 
-int8_t TIMER_OneShot (TIMER_HandleT handle);
+uint8_t TIMER_OneShot (TIMER_HandleT handle);
 
-int8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode);
+uint8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode);
 
-int8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
-                                  TIMER_CallbackT callbackPtr,
-                                  void* optArgPtr,
-                                  uint16_t callbackPeriod);
+uint8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
+                                   TIMER_CallbackT callbackPtr,
+                                   void* optArgPtr,
+                                   uint16_t callbackPeriod);
 
-int8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
-                                        uint16_t outputCompareA,
-                                        uint16_t outputCompareB);
+uint8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
+                                         uint16_t outputCompareA,
+                                         uint16_t outputCompareB);
 
-int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
-                                TIMER_ClockPrescalerT clockPrescaler);
+uint8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
+                                 TIMER_ClockPrescalerT clockPrescaler);
 
 uint16_t TIMER_GetClockPrescalerValue (TIMER_ClockPrescalerT prescaler);
 
 #if TIMER_WITH_COUNTDOWN
-int8_t TIMER_StartCountdown (TIMER_HandleT handle,
-                             TIMER_CallbackT callbackPtr,
-                             void* callbackArgPtr,
-                             uint16_t timeMs,
-                             uint16_t numberOfExecutions);
+uint8_t TIMER_StartCountdown (TIMER_HandleT handle,
+                              TIMER_CallbackT callbackPtr,
+                              void* callbackArgPtr,
+                              uint16_t timeMs,
+                              uint16_t numberOfExecutions);
 #endif // TIMER_WITH_COUNTDOWN
 
-int8_t TIMER_EnableDisableStopwatch (TIMER_HandleT handle,
-                                     TIMER_StopwatchEnableDisableT enableDisable);
+uint8_t TIMER_EnableDisableStopwatch (TIMER_HandleT handle,
+                                      TIMER_StopwatchEnableDisableT enableDisable);
 
-int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
-                                            uint32_t* clockCycles,
-                                            TIMER_StopwatchResetT stopwatchReset);
+uint8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
+                                             uint32_t* clockCycles,
+                                             TIMER_StopwatchResetT stopwatchReset);
 
-int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
-                                 uint32_t* timeMs,
-                                 TIMER_StopwatchResetT stopwatchReset);
+uint8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
+                                  uint32_t* timeMs,
+                                  TIMER_StopwatchResetT stopwatchReset);
 
-int8_t TIMER_SetStopwatchTimeCallback(TIMER_HandleT handle,
-                                      TIMER_CallbackT callbackPtr,
-                                      void* callbackArgPtr,
-                                      uint32_t clockCycles);
+uint8_t TIMER_SetStopwatchTimeCallback(TIMER_HandleT handle,
+                                       TIMER_CallbackT callbackPtr,
+                                       void* callbackArgPtr,
+                                       uint32_t clockCycles);
 
 #endif
 

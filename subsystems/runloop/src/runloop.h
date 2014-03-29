@@ -121,31 +121,31 @@ typedef uint8_t (*RUNLOOP_TaskCallbackT) (void* optArgPtr);
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
-                     TIMER_ClockPrescalerT timerClockPrescaler,
-                     UART_HandleT uartHandle,
-                     RUNLOOP_TaskErrorCallbackT taskErrorCallback,
-                     RUNLOOP_SyncErrorCallbackT syncErrorCallback);
+uint8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
+                      TIMER_ClockPrescalerT timerClockPrescaler,
+                      UART_HandleT uartHandle,
+                      RUNLOOP_TaskErrorCallbackT taskErrorCallback,
+                      RUNLOOP_SyncErrorCallbackT syncErrorCallback);
 
-int8_t RUNLOOP_AddTask (RUNLOOP_TaskCallbackT callbackPtr,
-                        void* callbackArgPtr,
-                        uint16_t numberOfExecutions,
-                        uint32_t periodMs,
-                        uint32_t initialDelayMs,
-                        uint8_t* taskIdPtr);
+uint8_t RUNLOOP_AddTask (RUNLOOP_TaskCallbackT callbackPtr,
+                         void* callbackArgPtr,
+                         uint16_t numberOfExecutions,
+                         uint32_t periodMs,
+                         uint32_t initialDelayMs,
+                         uint8_t* taskIdPtr);
 
 void RUNLOOP_Run (void);
 
 void RUNLOOP_Stop (void* optArgPtr);
 
 #if RUNLOOP_WITH_UPTIME
-int8_t RUNLOOP_GetUptimeClockCycles (uint64_t* systemClockCyclesPtr);
+uint8_t RUNLOOP_GetUptimeClockCycles (uint64_t* systemClockCyclesPtr);
 
-int8_t RUNLOOP_GetUptimeHumanReadable (uint16_t* daysPtr,
-                                       uint8_t*  hoursPtr,
-                                       uint8_t*  minutesPtr,
-                                       uint8_t*  secondsPtr,
-                                       uint16_t* millisecondsPtr);
+uint8_t RUNLOOP_GetUptimeHumanReadable (uint16_t* daysPtr,
+                                        uint8_t*  hoursPtr,
+                                        uint8_t*  minutesPtr,
+                                        uint8_t*  secondsPtr,
+                                        uint16_t* millisecondsPtr);
 #endif // RUNLOOP_WITH_UPTIME
 
 #endif // RUNLOOP_H

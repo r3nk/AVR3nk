@@ -8,7 +8,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -78,10 +78,10 @@ static struct
 **
 *******************************************************************************
 */
-int8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
-                   SPI_DataOrderT dataOrder,
-                   SPI_ClockPolarityT clockPolarity,
-                   SPI_ClockPhaseT clockPhase)
+uint8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
+                    SPI_DataOrderT dataOrder,
+                    SPI_ClockPolarityT clockPolarity,
+                    SPI_ClockPhaseT clockPhase)
 {
     uint8_t accu = 0;
 
@@ -159,7 +159,7 @@ int8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
 **
 *******************************************************************************
 */
-int8_t SPI_M_IsInitialized (void)
+uint8_t SPI_M_IsInitialized (void)
 {
     return(spimState.initialized);
 }

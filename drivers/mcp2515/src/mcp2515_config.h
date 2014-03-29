@@ -17,7 +17,7 @@
 **
 ** \sa      For bit timing settings see the example in MCP2515-I-P.pdf chapter 5.2
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **

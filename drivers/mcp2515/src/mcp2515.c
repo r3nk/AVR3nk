@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -322,14 +322,16 @@ static void mcp2515SetHeaderFormat(uint8_t address, uint16_t sid)
 **
 ** \return
 **          - #MCP2515_OK on success.
+**          - #MCP2515_ERR_ALREADY_INITIALIZED if the driver has already
+**              been initialized.
 **          - #MCP2515_ERR_SPI_NOT_INITIALIZED if the SPI driver is not
 **              initialized.
-**          - #MCP2515_ERR_VERIFY_REGISTER if the verification
+**          - #MCP2515_ERR_VERIFY_FAIL if the verification
 **              of the MCP2515_CNF1 register failed.
 **
 *******************************************************************************
 */
-int8_t MCP2515_Init(const MCP2515_InitParamsT* initParamsPtr)
+uint8_t MCP2515_Init(const MCP2515_InitParamsT* initParamsPtr)
 {
     uint8_t val;
 
@@ -550,18 +552,15 @@ int8_t MCP2515_Init(const MCP2515_InitParamsT* initParamsPtr)
 **          The MCP2515 CAN controller is reset. All pending transmissions
 **          are aborted. All connected interrupts are disabled.
 **
-** \return
-**          - #MCP2515_OK on success.
-**
 *******************************************************************************
 */
-int8_t  MCP2515_Exit(void)
+void MCP2515_Exit(void)
 {
     uint8_t val;
 
     if(!mcp2515State.initialized)
     {
-        return(MCP2515_OK);
+        return;
     }
     // Disable interrupt(s):
     EIMSK &= ~(1 << MCP2515_INTNO_MAIN);
@@ -597,7 +596,7 @@ int8_t  MCP2515_Exit(void)
                         (1 << MCP2515_REQOP0) );
 
     // BFPCTRL output pins already set to high-impedance by default (reset)
-    return(MCP2515_OK);
+    return;
 }
 
 /*!
@@ -726,17 +725,16 @@ void MCP2515_SetTxCallback(MCP2515_TxCallbackT txCallback)
 **              pending messages have the same priority level, the buffer
 **              with the highest ID will send first.
 ** \return
-**          - A MCP2515_TxBufferIdT member, denoting the buffer to which
+**          - A MCP2515_TxBufferIdT type, denoting the buffer to which
 **            the message was loaded.
-**          - MCP2515_ERR_NO_TRANSMIT_BUFFER_FREE
-**            if all transmit buffers are occupied.
+**          - 0 if all transmit buffers are occupied.
 **
 ** \sa      MCP2515-I-P.pdf 12.8
 **
 *******************************************************************************
 */
-int8_t MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
-                        MCP2515_TxParamsT txParams)
+MCP2515_TxBufferIdT MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
+                                     MCP2515_TxParamsT txParams)
 {
     uint8_t val, command, ii;
     MCP2515_TxPriorityT current_prio;
@@ -752,27 +750,27 @@ int8_t MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
     if ((txParams.bufferId & MCP2515_TX_BUFFER_2) && \
         ((val & (1 << MCP2515_RS_TX2REQ)) == 0))
     {
-        val = 2; // tx buffer index
+        val = MCP2515_TX_BUFFER_2; // tx buffer index
         current_prio = mcp2515State.txb2Priority;
         command = MCP2515_SPI_WRITE_TXB2SIDH;
     }
     else if ((txParams.bufferId & MCP2515_TX_BUFFER_1) && \
              ((val & (1 << MCP2515_RS_TX1REQ)) == 0))
     {
-        val = 1; // tx buffer index
+        val = MCP2515_TX_BUFFER_1; // tx buffer index
         current_prio = mcp2515State.txb1Priority;
         command = MCP2515_SPI_WRITE_TXB1SIDH;
     }
     else if ((txParams.bufferId & MCP2515_TX_BUFFER_0) && \
              ((val & (1 << MCP2515_RS_TX0REQ)) == 0))
     {
-        val = 0; // tx buffer index
+        val = MCP2515_TX_BUFFER_0; // tx buffer index
         current_prio = mcp2515State.txb0Priority;
         command = MCP2515_SPI_WRITE_TXB0SIDH;
     }
     else
     {
-        return(MCP2515_ERR_NO_TRANSMIT_BUFFER_FREE);
+        return 0;
     }
 
     // transmit sid/eid, rtr, dlc and data:
@@ -819,13 +817,13 @@ int8_t MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
         // set only ready-to-send bit:
         switch(val)
         {
-            case(2):
+            case(MCP2515_TX_BUFFER_2):
                 command = MCP2515_SPI_RTS_TXB2;
                 break;
-            case(1):
+            case(MCP2515_TX_BUFFER_1):
                 command = MCP2515_SPI_RTS_TXB1;
                 break;
-            case(0):
+            case(MCP2515_TX_BUFFER_0):
                 command = MCP2515_SPI_RTS_TXB0;
                 break;
         }
@@ -838,15 +836,15 @@ int8_t MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
         // set ready-to-send bit and transmit buffer priority:
         switch(val)
         {
-            case(2):
+            case(MCP2515_TX_BUFFER_2):
                 command = MCP2515_TXB2CTRL;
                 mcp2515State.txb2Priority = txParams.priority;
                 break;
-            case(1):
+            case(MCP2515_TX_BUFFER_1):
                 command = MCP2515_TXB1CTRL;
                 mcp2515State.txb1Priority = txParams.priority;
                 break;
-            case(0):
+            case(MCP2515_TX_BUFFER_0):
                 command = MCP2515_TXB0CTRL;
                 mcp2515State.txb0Priority = txParams.priority;
                 break;
@@ -859,7 +857,7 @@ int8_t MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
     }
     MCP2515_LEAVE_CS;
 
-    return((int8_t)val);
+    return val;
 }
 
 #if MCP2515_ERROR_CALLBACK_SUPPORT
