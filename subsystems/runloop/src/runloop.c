@@ -54,6 +54,10 @@
 #include <subsystems/cmdl.h>
 #include "runloop.h"
 
+#if RUNLOOP_DEBUG
+#include <stdio.h>
+#endif
+
 
 //*****************************************************************************
 //*************************** DEFINES AND MACROS ******************************
@@ -120,6 +124,9 @@ static void runloopEnterCmdl (void* optArgPtr);
 static void runloopCountdownCallback (void* optArgPtr);
 static void runloopActivateNewTasks (uint32_t elapsedTimeMs);
 static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs);
+#if RUNLOOP_DEBUG
+static void runloopPrintTask(uint8_t ii, uint32_t elapsedTimeMs, runloopTaskT* taskPtr);
+#endif
 
 
 //*****************************************************************************
@@ -138,6 +145,9 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs);
 */
 static void runloopEnterCmdl (void* optArgPtr)
 {
+#if RUNLOOP_DEBUG
+    printf("Entering CMDL.\n");
+#endif
     runloopHandle.flagCmdl = 1;
     return;
 }
@@ -219,6 +229,9 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs)
         if (runloopTaskSlotArr[ii].state == runloopTaskStateActive)
         {
             task_ptr = &runloopTaskSlotArr[ii];
+#if RUNLOOP_DEBUG
+            runloopPrintTask(ii, elapsedTimeMs, task_ptr);
+#endif
             if (task_ptr->timeToNextExecutionMs > elapsedTimeMs)
             {
                 // Update execution time:
@@ -292,6 +305,21 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs)
     return task_was_executed;
 }
 
+#if RUNLOOP_DEBUG
+static void runloopPrintTask(uint8_t ii, uint32_t elapsedTimeMs, runloopTaskT* taskPtr)
+{
+    printf("Task %02d - %d ms el. - cb: %04x ar: %04x re: %5d te: %5d pd: %5d st: %d\n",
+            ii,
+            elapsedTimeMs,
+            (uint16_t)taskPtr->callbackPtr,
+            (uint16_t)taskPtr->callbackArgPtr,
+            taskPtr->remainingExecutions,
+            taskPtr->timeToNextExecutionMs,
+            taskPtr->periodMs,
+            taskPtr->state);
+    return;
+}
+#endif
 
 //*****************************************************************************
 //*************************** PUBLIC FUNCTIONS ********************************
@@ -579,6 +607,7 @@ void RUNLOOP_Run (void)
                 // Reset watchdog:
                 wdt_reset();
 
+                // /*
                 // Enter sleep mode while idle:
                 cli();
                 #if RUNLOOP_DEBUG
@@ -600,6 +629,7 @@ void RUNLOOP_Run (void)
                 sei();
                 sleep_cpu();
                 sleep_disable();
+                // */
             }
             if (runloopHandle.flagCountdown == 0)
             {

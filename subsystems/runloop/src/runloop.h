@@ -46,22 +46,24 @@
 //*****************************************************************************
 
 /*! RUNLOOP specific error base */
-#define RUNLOOP_ERR_BASE                    0
+#ifndef RUNLOOP_ERR_BASE
+#define RUNLOOP_ERR_BASE                    110
+#endif
 
 /*! RUNLOOP returns with no errors. */
 #define RUNLOOP_OK                          0
 
 /*! A bad parameter has been passed. */
-#define RUNLOOP_ERR_BAD_PARAMETER           RUNLOOP_ERR_BASE - 1
+#define RUNLOOP_ERR_BAD_PARAMETER           RUNLOOP_ERR_BASE + 0
 
 /*! The runloop is already initialized. */
-#define RUNLOOP_ERR_ALREADY_INITIALIZED     RUNLOOP_ERR_BASE - 2
+#define RUNLOOP_ERR_ALREADY_INITIALIZED     RUNLOOP_ERR_BASE + 1
 
 /*! The TIMER driver could not be initialized. */
-#define RUNLOOP_ERR_TIMER_INITIALIZATION    RUNLOOP_ERR_BASE - 3
+#define RUNLOOP_ERR_TIMER_INITIALIZATION    RUNLOOP_ERR_BASE + 2
 
 /*! There is no task slot free to register a new task. */
-#define RUNLOOP_ERR_NO_TASK_SLOT_FREE       RUNLOOP_ERR_BASE - 4
+#define RUNLOOP_ERR_NO_TASK_SLOT_FREE       RUNLOOP_ERR_BASE + 3
 
 
 //*****************************************************************************
