@@ -52,7 +52,7 @@ APP_MACROS += CMDL_MAX_ARGUMENT_COUNT=16
 APP_MACROS += CMDL_DEBUG=0
 APP_MACROS += CMDL_USAGE_STRING_SUPPORT=0
 APP_MACROS += TIMER_INTERRUPT_SAFETY=0
-APP_MACROS += TIMER_ENABLE_COUNTDOWN=1
+APP_MACROS += TIMER_WITH_COUNTDOWN=0
 APP_MACROS += TIMER_COUNTDOWN_IMPRECISION=256
 APP_MACROS += RUNLOOP_MAX_NUMBER_OF_TASKS=4
 APP_MACROS += RUNLOOP_INTERRUPT_SAFETY=1
@@ -61,9 +61,6 @@ APP_MACROS += RUNLOOP_DEBUG=0
 ################################################################
 ## Pre-built Libraries
 ################################################################
-
-#LIBRARIES := buffer
-#LIBRARIES += uart
 
 # Add floating point support for printf:
 LIBRARIES := printf_flt

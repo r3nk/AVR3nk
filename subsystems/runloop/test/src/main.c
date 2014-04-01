@@ -266,8 +266,8 @@ static void appAddRunloopTaskViaCmdl(uint8_t argc, char* argv[])
     result = RUNLOOP_AddTask(appToggleLED,
                              NULL,
                              (uint16_t)strtoul(argv[1], NULL, 0),
-                             (uint16_t)strtoul(argv[2], NULL, 0),
-                             (uint16_t)strtoul(argv[3], NULL, 0));
+                             strtoul(argv[2], NULL, 0),
+                             strtoul(argv[3], NULL, 0));
     if (result != RUNLOOP_OK)
     {
         printf("RUNLOOP_AddTask: %d\n", result);
