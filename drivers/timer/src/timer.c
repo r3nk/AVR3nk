@@ -1,7 +1,8 @@
 /*!
 *******************************************************************************
 *******************************************************************************
-** \brief   Timer driver with support for PWM (Pulse Width Modulation)
+** \brief   Timer driver with an integrated stopwatch and countdown and
+**          support for PWM (Pulse Width Modulation) modes.
 **
 **          This driver allows to operate the AVRs' hardware timers.
 **          The initialization function TIMER_Init() returns a handle,
@@ -11,6 +12,10 @@
 **          one iteration, i.e., it stops after its next overflow.
 **          TIMER_StartCountdown() starts a countdown for a given amount
 **          of milliseconds and executes a callback after time has elapsed.
+**          In addition, a stopwatch allows to measure the elapsed time since
+**          it was activated. The stopwatch also allows to register a callback
+**          which will be automatically executed when the elapsed time reached
+**          a specified value.
 **
 ** \attention
 **          In order to safely call TIMER functions from within other ISRs,
@@ -87,7 +92,7 @@ typedef struct
     // Internal state:
     TIMER_TimerIdT                 timerId : 2;
     timerBitWidthT                 bitWidth : 1;
-    TIMER_StopwatchEnableT         stopwatchEnable : 1;
+    TIMER_StopwatchEnableDisableT  stopwatchEnable : 1;
     TIMER_OutputModeT              outputModeA : 2;
     TIMER_OutputModeT              outputModeB : 2;
     TIMER_WaveGenerationT          waveGenerationMode : 3;
@@ -104,7 +109,12 @@ typedef struct
     timerRegisterT        ocrb;
 
     // The stopwatch keeps track of elapsed system clock cycles:
-    volatile uint32_t     stopwatchCycles;
+    volatile uint32_t           stopwatchCycles;
+    uint32_t                    stopwatchOffsetCycles;
+    volatile TIMER_CallbackT    stopwatchTimeCallbackPtr;
+    void*                       stopwatchTimeCallbackArgPtr;
+    volatile uint32_t           stopwatchTimeRemainingOverflows;
+    volatile uint16_t           stopwatchTimeRemainder;
 
     // Overflow handling:
     volatile uint16_t     overflowCallbackCounter;
@@ -112,7 +122,7 @@ typedef struct
     TIMER_CallbackT       overflowCallbackPtr;
     void*                 overflowCallbackArgPtr;
 
-#if TIMER_ENABLE_COUNTDOWN
+#if TIMER_WITH_COUNTDOWN
     // Countdown handling:
     volatile uint16_t     countdownRemainingExecutions;
     TIMER_CallbackT       countdownCallbackPtr;
@@ -147,18 +157,17 @@ static int8_t timerSetPinsAsOutputs (timerHandleT* handlePtr);
 static int8_t timerSetPinsAsInputs (timerHandleT* handlePtr);
 static inline void timerStopClock (timerHandleT* handlePtr);
 static inline void timerResetTimerRegister (timerHandleT* handlePtr);
-#if TIMER_ENABLE_COUNTDOWN
+static inline void timerSetOcraRegister (timerHandleT* handlePtr, uint16_t value);
+#if TIMER_WITH_COUNTDOWN
 static void   timerNextSmallerPrescaler (uint32_t cycles,
                                          uint16_t* prescalerValue,
                                          TIMER_ClockPrescalerT* prescalerType);
-static inline void timerSetOcraRegister (timerHandleT* handlePtr, uint16_t value);
 static void   timerSetCountdownForRemainingCycles (timerHandleT* handlePtr);
 static inline void timerCountdownCallback (timerHandleT* handlePtr);
 #endif
 static void   timerOverflowHandler (timerHandleT* handlePtr);
-#if TIMER_ENABLE_COUNTDOWN
 static void   timerOutputCompareMatchHandler (timerHandleT* handlePtr);
-#endif
+static uint8_t timerIsOutputCompareMatchHandlerActive (timerHandleT* handlePtr);
 
 
 //*****************************************************************************
@@ -612,7 +621,31 @@ static inline void timerResetTimerRegister (timerHandleT* handlePtr)
     return;
 }
 
-#if TIMER_ENABLE_COUNTDOWN
+/*!
+*******************************************************************************
+** \brief   Set the OCRA register. This register is accessed via a union and
+**          may be 8 bit or 16 bit wide. This function handles the pointer
+**          access transparently.
+**
+** \param   handlePtr       A valid timer handle.
+** \param   value           The value to write to OCRA.
+**
+*******************************************************************************
+*/
+static inline void timerSetOcraRegister (timerHandleT* handlePtr, uint16_t value)
+{
+    if (handlePtr->bitWidth == timerBitWidth_8)
+    {
+        *handlePtr->ocra.uint8Ptr  = (uint8_t)value;
+    }
+    else // timerBitWidth_16
+    {
+        *handlePtr->ocra.uint16Ptr = value;
+    }
+    return;
+}
+
+#if TIMER_WITH_COUNTDOWN
 /*!
 *******************************************************************************
 ** \brief   Return the next smaller prescaler for a given number.
@@ -657,35 +690,9 @@ static void timerNextSmallerPrescaler (uint32_t cycles,
 
     return;
 }
-#endif // TIMER_ENABLE_COUNTDOWN
+#endif // TIMER_WITH_COUNTDOWN
 
-#if TIMER_ENABLE_COUNTDOWN
-/*!
-*******************************************************************************
-** \brief   Set the OCRA register. This register is accessed via a union and
-**          may be 8 bit or 16 bit wide. This function handles the pointer
-**          access transparently.
-**
-** \param   handlePtr       A valid timer handle.
-** \param   value           The value to write to OCRA.
-**
-*******************************************************************************
-*/
-static inline void timerSetOcraRegister (timerHandleT* handlePtr, uint16_t value)
-{
-    if (handlePtr->bitWidth == timerBitWidth_8)
-    {
-        *handlePtr->ocra.uint8Ptr  = (uint8_t)value;
-    }
-    else // timerBitWidth_16
-    {
-        *handlePtr->ocra.uint16Ptr = value;
-    }
-    return;
-}
-#endif // TIMER_ENABLE_COUNTDOWN
-
-#if TIMER_ENABLE_COUNTDOWN
+#if TIMER_WITH_COUNTDOWN
 /*!
 *******************************************************************************
 ** \brief   Temporarily stops the timer, and initiates a countdown for the
@@ -706,7 +713,7 @@ static void timerSetCountdownForRemainingCycles (timerHandleT* handlePtr)
 {
     TIMER_ClockPrescalerT prescaler_type;
     uint16_t prescaler_val = 0;
-    uint32_t timer_ticks = 0;
+    uint32_t timer_cycles = 0;
     uint32_t max_timer_val = 0;
 
     // Stop clock temporarily:
@@ -723,10 +730,10 @@ static void timerSetCountdownForRemainingCycles (timerHandleT* handlePtr)
     // Calculate new settings:
     timerNextSmallerPrescaler(handlePtr->countdownRemainingCycles,
                               &prescaler_val, &prescaler_type);
-    timer_ticks = handlePtr->countdownRemainingCycles / prescaler_val;
+    timer_cycles = handlePtr->countdownRemainingCycles / prescaler_val;
     max_timer_val = (1UL << (handlePtr->bitWidth == timerBitWidth_8 ? 8 : 16));
-    handlePtr->countdownRemainingOverflows = timer_ticks / max_timer_val;
-    handlePtr->countdownRemainder = (uint16_t)timer_ticks % max_timer_val;
+    handlePtr->countdownRemainingOverflows = timer_cycles / max_timer_val;
+    handlePtr->countdownRemainder = (uint16_t)(timer_cycles % max_timer_val);
     handlePtr->countdownRemainingCycles %= prescaler_val;
 
     // If overflows will occur, enable the overflow interrupt.
@@ -749,9 +756,9 @@ static void timerSetCountdownForRemainingCycles (timerHandleT* handlePtr)
 
     return;
 }
-#endif // TIMER_ENABLE_COUNTDOWN
+#endif // TIMER_WITH_COUNTDOWN
 
-#if TIMER_ENABLE_COUNTDOWN
+#if TIMER_WITH_COUNTDOWN
 /*!
 *******************************************************************************
 ** \brief   Executes the countdown callback. If the callback is to be executed
@@ -793,7 +800,7 @@ static inline void timerCountdownCallback (timerHandleT* handlePtr)
     handlePtr->countdownCallbackPtr(handlePtr->countdownCallbackArgPtr);
     return;
 }
-#endif // TIMER_ENABLE_COUNTDOWN
+#endif // TIMER_WITH_COUNTDOWN
 
 /*!
 *******************************************************************************
@@ -826,15 +833,73 @@ static void timerOverflowHandler (timerHandleT* handlePtr)
         handlePtr->stopwatchCycles += \
             ((handlePtr->bitWidth == timerBitWidth_8) ? 0x100UL : 0x10000UL) * \
             TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler);
+        if (handlePtr->stopwatchTimeCallbackPtr)
+        {
+            if (handlePtr->stopwatchTimeRemainingOverflows > 0)
+            {
+                handlePtr->stopwatchTimeRemainingOverflows--;
+                if (handlePtr->stopwatchTimeRemainingOverflows == 0)
+                {
+                    if (handlePtr->stopwatchTimeRemainder == 0)
+                    {
+                        // Execute and clear the callback immediately:
+                        handlePtr->stopwatchTimeCallbackPtr \
+                            (handlePtr->stopwatchTimeCallbackArgPtr);
+                        handlePtr->stopwatchTimeCallbackPtr = NULL;
+                        handlePtr->stopwatchTimeCallbackArgPtr = NULL;
+                    }
+                    else
+                    {
+                        // Set up the output compare match:
+                        timerSetOcraRegister (handlePtr, handlePtr->stopwatchTimeRemainder);
+                        *handlePtr->tifrPtr = (1 << OCF0A); // clear interrupt flag
+                        // Handle the case that the output compare match was missed.
+                        // This may happen if ...
+                        //  a) a low output compare match is set while the timer is running
+                        //     with a low prescaler.
+                        //  b) other interrupts or critical sections have delayed the execution
+                        //     of this interrupt handler.
+                        timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
+                                        *handlePtr->tcnt.uint8Ptr :
+                                        *handlePtr->tcnt.uint16Ptr;
+                        if (timer_value >= handlePtr->stopwatchTimeRemainder)
+                        {
+                            // Execute and clear the callback immediately:
+                            handlePtr->stopwatchTimeCallbackPtr \
+                                (handlePtr->stopwatchTimeCallbackArgPtr);
+                            handlePtr->stopwatchTimeCallbackPtr = NULL;
+                            handlePtr->stopwatchTimeCallbackArgPtr = NULL;
+                        }
+                        else
+                        {
+                            // Enable output compare match interrupt:
+                            *handlePtr->timskPtr |= (1 << OCIE0A);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // The output compare match was missed during its setup
+                // by TIMER_SetStopwatchTimeCallback(). This might happen
+                // in rare cases with a low prescaler and a high remainder.
+                // Execute and clear the callback:
+                handlePtr->stopwatchTimeCallbackPtr \
+                    (handlePtr->stopwatchTimeCallbackArgPtr);
+                handlePtr->stopwatchTimeCallbackPtr = NULL;
+                handlePtr->stopwatchTimeCallbackArgPtr = NULL;
+                *handlePtr->timskPtr &= ~(1 << OCIE0A);
+            }
+        }
     }
-#if TIMER_ENABLE_COUNTDOWN
+#if TIMER_WITH_COUNTDOWN
     if (handlePtr->timerState == timerStateCountdown)
     {
         if (handlePtr->countdownRemainingOverflows > 0)
         {
             handlePtr->countdownRemainingOverflows--;
         }
-        else
+        if (handlePtr->countdownRemainingOverflows == 0)
         {
             if (handlePtr->countdownRemainder == 0)
             {
@@ -850,16 +915,16 @@ static void timerOverflowHandler (timerHandleT* handlePtr)
             else
             {
                 timerSetOcraRegister (handlePtr, handlePtr->countdownRemainder);
-                *handlePtr->timskPtr |= (1 << OCIE0A);
-                timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
-                                *handlePtr->tcnt.uint8Ptr :
-                                *handlePtr->tcnt.uint16Ptr;
+                *handlePtr->tifrPtr = (1 << OCF0A); // clear compare match interrupt flag
                 // Handle the case that the output compare match was missed.
                 // This may happen if ...
-                //  a) if a low output compare match is set while the timer is running
+                //  a) a low output compare match is set while the timer is running
                 //     with a low prescaler.
                 //  b) other interrupts or critical sections have delayed the execution
                 //     of this interrupt handler.
+                timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
+                                *handlePtr->tcnt.uint8Ptr :
+                                *handlePtr->tcnt.uint16Ptr;
                 if (timer_value >= handlePtr->countdownRemainder)
                 {
                     if (handlePtr->countdownRemainingCycles > TIMER_COUNTDOWN_IMPRECISION)
@@ -871,10 +936,15 @@ static void timerOverflowHandler (timerHandleT* handlePtr)
                         timerCountdownCallback(handlePtr);
                     }
                 }
+                else
+                {
+                    // Enable output compare match interrupt:
+                    *handlePtr->timskPtr |= (1 << OCIE0A);
+                }
             }
         }
     }
-#endif // TIMER_ENABLE_COUNTDOWN
+#endif // TIMER_WITH_COUNTDOWN
     if (handlePtr->overflowCallbackPtr)
     {
         // Overflow callback:
@@ -888,12 +958,11 @@ static void timerOverflowHandler (timerHandleT* handlePtr)
     return;
 }
 
-#if TIMER_ENABLE_COUNTDOWN
 /*!
 *******************************************************************************
 ** \brief   Generic interrupt handler that is executed when a timer output
 **          compare match occurs. This function is used in concert with the
-**          countdown feature.
+**          countdown feature and the stopwatch timer.
 **
 ** \param   handlePtr   The handle associated with the timer that triggered
 **                      the interrupt.
@@ -902,19 +971,31 @@ static void timerOverflowHandler (timerHandleT* handlePtr)
 */
 static void timerOutputCompareMatchHandler (timerHandleT* handlePtr)
 {
-    if (handlePtr->countdownRemainingCycles > TIMER_COUNTDOWN_IMPRECISION)
+    if ((handlePtr->stopwatchEnable)
+    &&  (handlePtr->stopwatchTimeCallbackPtr))
     {
-        timerSetCountdownForRemainingCycles(handlePtr);
+        handlePtr->stopwatchTimeCallbackPtr \
+            (handlePtr->stopwatchTimeCallbackArgPtr);
+        handlePtr->stopwatchTimeCallbackPtr = NULL;
+        handlePtr->stopwatchTimeCallbackArgPtr = NULL;
+        *handlePtr->timskPtr &= ~(1 << OCIE0A);
     }
-    else
+#if TIMER_WITH_COUNTDOWN
+    else if (handlePtr->timerState == timerStateCountdown)
     {
-        timerCountdownCallback(handlePtr);
+        if (handlePtr->countdownRemainingCycles > TIMER_COUNTDOWN_IMPRECISION)
+        {
+            timerSetCountdownForRemainingCycles(handlePtr);
+        }
+        else
+        {
+            timerCountdownCallback(handlePtr);
+        }
     }
+#endif // TIMER_WITH_COUNTDOWN
     return;
 }
-#endif // TIMER_ENABLE_COUNTDOWN
 
-#if TIMER_ENABLE_COUNTDOWN
 /*!
 *******************************************************************************
 ** \brief   Indicates whether the output compare match handler is active.
@@ -928,14 +1009,22 @@ static void timerOutputCompareMatchHandler (timerHandleT* handlePtr)
 */
 static uint8_t timerIsOutputCompareMatchHandlerActive (timerHandleT* handlePtr)
 {
+    if ((handlePtr->stopwatchEnable)
+    &&  (handlePtr->stopwatchTimeCallbackPtr)
+    &&  (handlePtr->stopwatchTimeRemainingOverflows == 0)
+    &&  (handlePtr->stopwatchTimeRemainder > 0))
+    {
+        return 1;
+    }
+#if TIMER_WITH_COUNTDOWN
     if ((handlePtr->timerState == timerStateCountdown)
     &&  (handlePtr->countdownRemainingOverflows == 0))
     {
         return 1;
     }
+#endif // TIMER_WITH_COUNTDOWN
     return 0;
 }
-#endif // TIMER_ENABLE_COUNTDOWN
 
 
 //*****************************************************************************
@@ -1159,6 +1248,7 @@ int8_t TIMER_Exit (TIMER_HandleT handle)
 int8_t TIMER_Start (TIMER_HandleT handle)
 {
     int8_t result = 0;
+    uint8_t timsk = 0;
 
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1180,12 +1270,18 @@ int8_t TIMER_Start (TIMER_HandleT handle)
         // Start the timer by setting the clock select bits:
         result = timerStartClock(handlePtr);
 
-        // Enable timer overflow interrupt if needed:
-        if ((handlePtr->overflowCallbackPtr)
-        ||  (handlePtr->stopwatchEnable))
+        // Enable output compare interrupt:
+        if (timerIsOutputCompareMatchHandlerActive (handlePtr))
         {
-            *handlePtr->timskPtr |= (1 << TOIE0);
+            timsk |= (1 << OCIE0A);
         }
+        // Enable timer overflow interrupt:
+        if ((handlePtr->stopwatchEnable)
+        ||  (handlePtr->overflowCallbackPtr))
+        {
+            timsk |= (1 << TOIE0);
+        }
+        *handlePtr->timskPtr |= timsk;
         ////////////////////////////////////////////////
     }
     return result;
@@ -1217,6 +1313,7 @@ int8_t TIMER_Start (TIMER_HandleT handle)
 int8_t TIMER_OneShot (TIMER_HandleT handle)
 {
     int8_t result = 0;
+    uint8_t timsk = 0;
 
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
@@ -1232,10 +1329,8 @@ int8_t TIMER_OneShot (TIMER_HandleT handle)
         // Enter critical section:
         *handlePtr->timskPtr &= ~( (1 << OCIE0A) | (1 << TOIE0) );
 
-        // If a callback is set, it has already cleared the overflow flag
-        // during the last iteration in the ISR. Otherwise, clear the overflow
-        // flag here so that the interrupt won't be triggered immediately but
-        // AFTER the next timer overflow:
+        // Clear the timer overflow flag if there was previously no state
+        // which would have cleared the flag automatically in ISR:
         if ((handlePtr->overflowCallbackPtr == NULL)
         &&  (handlePtr->stopwatchEnable == 0)
         &&  (handlePtr->timerState != timerStateCountdown))
@@ -1249,8 +1344,14 @@ int8_t TIMER_OneShot (TIMER_HandleT handle)
         // Start the timer by setting the clock select bits:
         result = timerStartClock(handlePtr);
 
+        // Enable output compare interrupt:
+        if (timerIsOutputCompareMatchHandlerActive (handlePtr))
+        {
+            timsk |= (1 << OCIE0A);
+        }
         // Leave critical section by enabling timer overflow interrupt:
-        *handlePtr->timskPtr |= (1 << TOIE0);
+        timsk |= (1 << TOIE0);
+        *handlePtr->timskPtr |= timsk;
         ////////////////////////////////////////////////
     }
     return result;
@@ -1288,6 +1389,7 @@ int8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode)
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
+        uint8_t timsk = 0;
         timerHandleT* handlePtr = (timerHandleT*)handle;
         if ((handlePtr == NULL) || (handlePtr->tccraPtr == NULL))
         {
@@ -1302,10 +1404,8 @@ int8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode)
         {
             if (handlePtr->timerState != timerStateStopped)
             {
-                // If a callback is set, it has already cleared the overflow flag
-                // during the last iteration in the ISR. Otherwise, clear the overflow
-                // flag here so that the interrupt won't be triggered immediately but
-                // AFTER the current iteration:
+                // Clear the timer overflow flag if there was previously no state
+                // which would have cleared the flag automatically in ISR:
                 if ((handlePtr->overflowCallbackPtr == NULL)
                 &&  (handlePtr->stopwatchEnable == 0)
                 &&  (handlePtr->timerState != timerStateCountdown))
@@ -1316,8 +1416,14 @@ int8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode)
                 // Make the timer stop in the ISR after current run:
                 handlePtr->timerState = timerStateOneShot;
 
+                // Enable output compare interrupt:
+                if (timerIsOutputCompareMatchHandlerActive (handlePtr))
+                {
+                    timsk |= (1 << OCIE0A);
+                }
                 // Leave critical section by enabling timer overflow interrupt:
-                *handlePtr->timskPtr |= (1 << TOIE0);
+                timsk |= (1 << TOIE0);
+                *handlePtr->timskPtr |= timsk;
                 ////////////////////////////////////////////
             }
         }
@@ -1328,9 +1434,9 @@ int8_t TIMER_Stop (TIMER_HandleT handle, TIMER_StopT stopMode)
             if (stopMode == TIMER_Stop_ImmediatelyAndReset)
             {
                 timerResetTimerRegister(handlePtr);
+                // Clear the interrupt flags:
+                *handlePtr->tifrPtr = (1 << OCF0A) | (1 << TOV0);
             }
-            // Clear the interrupt flags:
-            *handlePtr->tifrPtr = (1 << OCF0A) | (1 << TOV0);
             // Set timer state:
             handlePtr->timerState = timerStateStopped;
         }
@@ -1367,6 +1473,7 @@ int8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
+        uint8_t timsk = 0;
         timerHandleT* handlePtr = (timerHandleT*)handle;
         if ((handlePtr == NULL) || (handlePtr->tccraPtr == NULL))
         {
@@ -1394,16 +1501,17 @@ int8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
         // Enable output compare interrupt:
         if (timerIsOutputCompareMatchHandlerActive (handlePtr))
         {
-            *handlePtr->timskPtr |= (1 << OCIE0A);
+            timsk |= (1 << OCIE0A);
         }
         // Enable overflow interrupt:
-        if((handlePtr->overflowCallbackPtr)
-        || (handlePtr->stopwatchEnable)
+        if((handlePtr->stopwatchEnable)
+        || (handlePtr->overflowCallbackPtr)
         || (handlePtr->timerState == timerStateOneShot)
         || (handlePtr->timerState == timerStateCountdown))
         {
-            *handlePtr->timskPtr |= (1 << TOIE0);
+            timsk |= (1 << TOIE0);
         }
+        *handlePtr->timskPtr |= timsk;
         ////////////////////////////////////////////////
     }
     return (TIMER_OK);
@@ -1430,6 +1538,8 @@ int8_t TIMER_SetOverflowCallback (TIMER_HandleT handle,
 ** \return
 **          - #TIMER_OK on success.
 **          - #TIMER_ERR_BAD_HANDLE if the handle is invalid.
+**          - #TIMER_ERR_RESOURCE_CONFLICT if the timer is operated in
+**              countdown mode or if the stopwatch has registered a callback.
 **
 *******************************************************************************
 */
@@ -1447,6 +1557,13 @@ int8_t TIMER_SetOutputCompareRegisters (TIMER_HandleT handle,
             return (TIMER_ERR_BAD_HANDLE);
         }
 
+        if ( (handlePtr->stopwatchEnable && handlePtr->stopwatchTimeCallbackPtr)
+        ||   (handlePtr->timerState == timerStateCountdown) )
+        {
+            return (TIMER_ERR_RESOURCE_CONFLICT);
+        }
+
+        // Set the registers:
         if (handlePtr->bitWidth == timerBitWidth_8)
         {
             *handlePtr->ocra.uint8Ptr = (uint8_t)outputCompareA;
@@ -1504,6 +1621,7 @@ int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
+        uint8_t timsk = 0;
         timerHandleT* handlePtr = (timerHandleT*)handle;
         if ((handlePtr == NULL) || (handlePtr->tccraPtr == NULL))
         {
@@ -1527,22 +1645,24 @@ int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
             result = timerStartClock(handlePtr);
 
             // Note that it is discouraged to change the clock prescaler
-            // while the timer is in countdown mode. However, this
-            // case is still handled here for correctness.
+            // while the timer is in countdown mode or if the stopwatch
+            // is enabled. However, this case is still handled here for
+            // correctness.
 
             // Enable output compare interrupt:
             if (timerIsOutputCompareMatchHandlerActive (handlePtr))
             {
-                *handlePtr->timskPtr |= (1 << OCIE0A);
+                timsk |= (1 << OCIE0A);
             }
-            // Enable timer overflow interrupt:
-            if((handlePtr->overflowCallbackPtr)
-            || (handlePtr->stopwatchEnable)
+            // Enable overflow interrupt:
+            if((handlePtr->stopwatchEnable)
+            || (handlePtr->overflowCallbackPtr)
             || (handlePtr->timerState == timerStateOneShot)
             || (handlePtr->timerState == timerStateCountdown)) // discouraged
             {
-                *handlePtr->timskPtr |= (1 << TOIE0);
+                timsk |= (1 << TOIE0);
             }
+            *handlePtr->timskPtr |= timsk;
             ////////////////////////////////////////////////
         }
     }
@@ -1583,7 +1703,7 @@ uint16_t TIMER_GetClockPrescalerValue (TIMER_ClockPrescalerT prescaler)
     }
 }
 
-#if TIMER_ENABLE_COUNTDOWN
+#if TIMER_WITH_COUNTDOWN
 /*!
 *******************************************************************************
 ** \brief   Start a countdown.
@@ -1613,6 +1733,9 @@ uint16_t TIMER_GetClockPrescalerValue (TIMER_ClockPrescalerT prescaler)
 **          - #TIMER_ERR_INCOMPATIBLE_WGM if the timer is initialized with
 **              a wave generation mode other than
 **              TIMER_WaveGeneration_NormalMode.
+**          - #TIMER_ERR_RESOURCE_CONFLICT if the stopwatch has registered
+**              a timer callback, which also makes use of the output compare
+**              match interrupt.
 **
 *******************************************************************************
 */
@@ -1641,6 +1764,15 @@ int8_t TIMER_StartCountdown (TIMER_HandleT handle,
         if (handlePtr->waveGenerationMode != TIMER_WaveGeneration_NormalMode)
         {
             return (TIMER_ERR_INCOMPATIBLE_WGM);
+        }
+
+        // Check if a stopwatch callback is registered:
+        // Note: The handle should actually be accessed in a critical section. However,
+        // the ISR may only clear the callback, but it does not set it, so it's safe.
+        if ((handlePtr->stopwatchEnable)
+        &&  (handlePtr->stopwatchTimeCallbackPtr))
+        {
+            return (TIMER_ERR_RESOURCE_CONFLICT);
         }
 
         // In case of no delay, execute immediately:
@@ -1676,18 +1808,18 @@ int8_t TIMER_StartCountdown (TIMER_HandleT handle,
     }
     return (TIMER_OK);
 }
-#endif // TIMER_ENABLE_COUNTDOWN
+#endif // TIMER_WITH_COUNTDOWN
 
 /*!
 *******************************************************************************
-** \brief   Reset the stopwatch. This function also allows to enable or
-**          disable the stopwatch. The stopwatch will count cycles during
-**          operation in any modes (like PWM, coutndown, oneshot).
+** \brief   Enables or disables the stopwatch. This function also resets the
+**          stopwatch. The stopwatch will count cycles during operation in any
+**          modes (like PWM, countdown, oneshot).
 **          The time can be read by calling TIMER_GetStopwatchSystemClockCycles()
 **          and TIMER_GetStopwatchTimeMs().
 **
 ** \param   handle              A valid timer handle.
-** \param   stopwatchEnable     Specifies whether the stopwatch will be
+** \param   enableDisable       Specifies whether the stopwatch will be
 **                              enabled or disabled.
 **
 ** \return
@@ -1696,13 +1828,17 @@ int8_t TIMER_StartCountdown (TIMER_HandleT handle,
 **
 *******************************************************************************
 */
-int8_t TIMER_ResetStopwatch (TIMER_HandleT handle,
-                             TIMER_StopwatchEnableT stopwatchEnable)
+int8_t TIMER_EnableDisableStopwatch (TIMER_HandleT handle,
+                                     TIMER_StopwatchEnableDisableT enableDisable)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
+        uint16_t prescaler = 0;
+        uint32_t timer_value = 0;
+        uint8_t timsk = 0;
+
         timerHandleT* handlePtr = (timerHandleT*)handle;
         if ((handlePtr == NULL) || (handlePtr->tccraPtr == NULL))
         {
@@ -1724,22 +1860,38 @@ int8_t TIMER_ResetStopwatch (TIMER_HandleT handle,
         }
 
         // Update the handle's internal state:
-        handlePtr->stopwatchEnable = stopwatchEnable;
+        handlePtr->stopwatchEnable = enableDisable;
         handlePtr->stopwatchCycles = 0;
+        handlePtr->stopwatchOffsetCycles = 0;
+        handlePtr->stopwatchTimeCallbackPtr = NULL;
+        handlePtr->stopwatchTimeCallbackArgPtr = NULL;
+        handlePtr->stopwatchTimeRemainingOverflows = 0;
+        handlePtr->stopwatchTimeRemainder = 0;
+
+        if (enableDisable == TIMER_Stopwatch_Enable)
+        {
+            // In case that the timer is already running, get the current time:
+            prescaler = TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler);
+            timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
+                            *handlePtr->tcnt.uint8Ptr :
+                            *handlePtr->tcnt.uint16Ptr;
+            handlePtr->stopwatchOffsetCycles = timer_value * prescaler;
+        }
 
         // Enable output compare interrupt:
         if (timerIsOutputCompareMatchHandlerActive (handlePtr))
         {
-            *handlePtr->timskPtr |= (1 << OCIE0A);
+            timsk |= (1 << OCIE0A);
         }
         // Enable overflow interrupt:
-        if((handlePtr->overflowCallbackPtr)
-        || (handlePtr->stopwatchEnable)
+        if((handlePtr->stopwatchEnable)
+        || (handlePtr->overflowCallbackPtr)
         || (handlePtr->timerState == timerStateOneShot)
         || (handlePtr->timerState == timerStateCountdown))
         {
-            *handlePtr->timskPtr |= (1 << TOIE0);
+            timsk |= (1 << TOIE0);
         }
+        *handlePtr->timskPtr |= timsk;
         ////////////////////////////////////////////////
     }
     return (TIMER_OK);
@@ -1759,6 +1911,7 @@ int8_t TIMER_ResetStopwatch (TIMER_HandleT handle,
 ** \param   handle              A valid timer handle.
 ** \param   clockCycles         Will receive the number of counted system
 **                              clock cycles.
+** \param   stopwatchReset      Defines whether to reset the stopwatch.
 **
 ** \return
 **          - #TIMER_OK on success.
@@ -1767,43 +1920,58 @@ int8_t TIMER_ResetStopwatch (TIMER_HandleT handle,
 *******************************************************************************
 */
 int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
-                                            uint32_t* clockCycles)
+                                            uint32_t* clockCycles,
+                                            TIMER_StopwatchResetT stopwatchReset)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
+        uint16_t prescaler = 0;
         uint32_t timer_value = 0;
+        uint8_t timsk = 0;
 
         timerHandleT* handlePtr = (timerHandleT*)handle;
         if ((handlePtr == NULL) || (handlePtr->tccraPtr == NULL))
         {
             return (TIMER_ERR_BAD_HANDLE);
         }
+        if (! handlePtr->stopwatchEnable)
+        {
+            return (TIMER_ERR_STOPWATCH_DISABLED);
+        }
 
         ////////////////////////////////////////////////
         // Enter critical section:
         *handlePtr->timskPtr &= ~( (1 << OCIE0A) | (1 << TOIE0) );
 
+        prescaler = TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler);
         timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
                         *handlePtr->tcnt.uint8Ptr :
                         *handlePtr->tcnt.uint16Ptr;
-        *clockCycles = handlePtr->stopwatchCycles + \
-           (timer_value * TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler));
+        *clockCycles = (handlePtr->stopwatchCycles + (timer_value * prescaler)) - \
+                        handlePtr->stopwatchOffsetCycles;
+
+        if (stopwatchReset == TIMER_Stopwatch_Reset)
+        {
+            handlePtr->stopwatchCycles = 0;
+            handlePtr->stopwatchOffsetCycles = timer_value * prescaler;
+        }
 
         // Enable output compare interrupt:
         if (timerIsOutputCompareMatchHandlerActive (handlePtr))
         {
-            *handlePtr->timskPtr |= (1 << OCIE0A);
+            timsk |= (1 << OCIE0A);
         }
         // Enable overflow interrupt:
-        if((handlePtr->overflowCallbackPtr)
-        || (handlePtr->stopwatchEnable)
+        if((handlePtr->stopwatchEnable)
+        || (handlePtr->overflowCallbackPtr)
         || (handlePtr->timerState == timerStateOneShot)
         || (handlePtr->timerState == timerStateCountdown))
         {
-            *handlePtr->timskPtr |= (1 << TOIE0);
+            timsk |= (1 << TOIE0);
         }
+        *handlePtr->timskPtr |= timsk;
         ////////////////////////////////////////////////
     }
     return (TIMER_OK);
@@ -1812,8 +1980,6 @@ int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
 /*!
 *******************************************************************************
 ** \brief   Reads out the stop watch and returns a value in milliseconds.
-**          The accuracy of the returned value depends on the prescalers that
-**          the timer was operated with.
 **
 ** \attention
 **          The stopwatch internally uses a 32-bit variable to count system
@@ -1822,6 +1988,7 @@ int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
 **
 ** \param   handle              A valid timer handle.
 ** \param   timeMs              Will receive the number of milliseconds.
+** \param   stopwatchReset      Defines whether to reset the stopwatch.
 **
 ** \return
 **          - #TIMER_OK on success.
@@ -1830,48 +1997,195 @@ int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
 *******************************************************************************
 */
 int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
-                                 uint32_t* timeMs)
+                                 uint32_t* timeMs,
+                                 TIMER_StopwatchResetT stopwatchReset)
 {
 #if TIMER_INTERRUPT_SAFETY
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
+        uint16_t prescaler = 0;
         uint32_t timer_value = 0;
-        uint32_t total_cycles = 0;
+        uint32_t elapsed_cycles = 0;
+        uint8_t timsk = 0;
 
         timerHandleT* handlePtr = (timerHandleT*)handle;
         if ((handlePtr == NULL) || (handlePtr->tccraPtr == NULL))
         {
             return (TIMER_ERR_BAD_HANDLE);
         }
+        if (! handlePtr->stopwatchEnable)
+        {
+            return (TIMER_ERR_STOPWATCH_DISABLED);
+        }
 
         ////////////////////////////////////////////////
         // Enter critical section:
         *handlePtr->timskPtr &= ~( (1 << OCIE0A) | (1 << TOIE0) );
 
+        prescaler = TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler);
         timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
                         *handlePtr->tcnt.uint8Ptr :
                         *handlePtr->tcnt.uint16Ptr;
-        total_cycles = handlePtr->stopwatchCycles + \
-           (timer_value * TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler));
-        *timeMs = total_cycles / (F_CPU / 1000UL);
+        elapsed_cycles = (handlePtr->stopwatchCycles + (timer_value * prescaler)) - \
+                        handlePtr->stopwatchOffsetCycles;
+        *timeMs = elapsed_cycles / (F_CPU / 1000UL);
+
+        if (stopwatchReset == TIMER_Stopwatch_Reset)
+        {
+            handlePtr->stopwatchCycles = 0;
+            handlePtr->stopwatchOffsetCycles = timer_value * prescaler;
+        }
 
         // Enable output compare interrupt:
         if (timerIsOutputCompareMatchHandlerActive (handlePtr))
         {
-            *handlePtr->timskPtr |= (1 << OCIE0A);
+            timsk |= (1 << OCIE0A);
         }
         // Enable overflow interrupt:
-        if((handlePtr->overflowCallbackPtr)
-        || (handlePtr->stopwatchEnable)
+        if((handlePtr->stopwatchEnable)
+        || (handlePtr->overflowCallbackPtr)
         || (handlePtr->timerState == timerStateOneShot)
         || (handlePtr->timerState == timerStateCountdown))
         {
-            *handlePtr->timskPtr |= (1 << TOIE0);
+            timsk |= (1 << TOIE0);
         }
+        *handlePtr->timskPtr |= timsk;
         ////////////////////////////////////////////////
     }
     return (TIMER_OK);
+}
+
+/*!
+*******************************************************************************
+** \brief   Sets up a callback with the stopwatch that is executed when the
+**          stopwatch has elapsed a given number of system clock cycles.
+**
+**          The elapsed time is relative to the moment that the stopwatch
+**          was reset last, e.g., by TIMER_EnableDisableStopwatch(),
+**          TIMER_GetStopwatchSystemClockCycles() or TIMER_GetStopwatchTimeMs().
+**          If the stopwatch has already elapsed the given number of system
+**          clock cycles since its last reset, the callback will be executed
+**          immediately.
+**
+** \param   handle              A valid timer handle.
+** \param   callbackPtr         The callback function to register.
+** \param   callbackArgPtr      An optional pointer that will be passed to
+**                              the callback when executed. May be NULL.
+** \param   clockCycles         The number of system clock cycles that the
+**                              stopwatch will elapse until the callback is
+**                              executed.
+**
+** \return
+**          - #TIMER_OK on success.
+**          - #TIMER_ERR_BAD_HANDLE if the handle is invalid.
+**          - #TIMER_ERR_STOPWATCH_DISABLED if the stopwatch is disabled.
+**          - #TIMER_ERR_BAD_PARAMETER if callbackPtr is NULL.
+**          - #TIMER_ERR_RESOURCE_CONFLICT if the timer is being operated
+**              in countdown mode, which also makes use of the output compare
+**              match interrupt.
+**
+*******************************************************************************
+*/
+int8_t TIMER_SetStopwatchTimeCallback(TIMER_HandleT handle,
+                                      TIMER_CallbackT callbackPtr,
+                                      void* callbackArgPtr,
+                                      uint32_t clockCycles)
+{
+#if TIMER_INTERRUPT_SAFETY
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+#endif
+    {
+        uint16_t prescaler = 0;
+        uint32_t timer_value = 0;
+        uint32_t current_cycles = 0;
+        uint32_t timer_cycles = 0;
+        uint32_t max_timer_val = 0;
+        uint8_t  timsk = 0;
+
+        timerHandleT* handlePtr = (timerHandleT*)handle;
+        if ((handlePtr == NULL) || (handlePtr->tccraPtr == NULL))
+        {
+            return (TIMER_ERR_BAD_HANDLE);
+        }
+        if (! handlePtr->stopwatchEnable)
+        {
+            return (TIMER_ERR_STOPWATCH_DISABLED);
+        }
+        if (callbackPtr == NULL)
+        {
+            return (TIMER_ERR_BAD_PARAMETER);
+        }
+        // Note: The handle access is actually a critical section. However,
+        // the ISRs can only leave the countdown state, but they never make
+        // the timer enter this state from any other state.
+        if (handlePtr->timerState == timerStateCountdown)
+        {
+            return (TIMER_ERR_RESOURCE_CONFLICT);
+        }
+
+        ////////////////////////////////////////////////
+        // Enter critical section:
+        *handlePtr->timskPtr &= ~( (1 << OCIE0A) | (1 << TOIE0) );
+
+        // Set up the callback function:
+        handlePtr->stopwatchTimeCallbackPtr = callbackPtr;
+        handlePtr->stopwatchTimeCallbackArgPtr = callbackArgPtr;
+
+        // Get  the number of currently elapsed system clock cycles:
+        prescaler = TIMER_GetClockPrescalerValue(handlePtr->clockPrescaler);
+        timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
+                        *handlePtr->tcnt.uint8Ptr :
+                        *handlePtr->tcnt.uint16Ptr;
+        current_cycles = (handlePtr->stopwatchCycles + (timer_value * prescaler)) - \
+                          handlePtr->stopwatchOffsetCycles;
+
+        // In case that the time is already over, execute immediately:
+        if (current_cycles >= clockCycles)
+        {
+            callbackPtr(callbackArgPtr);
+            handlePtr->stopwatchTimeCallbackPtr = NULL;
+            handlePtr->stopwatchTimeCallbackArgPtr = NULL;
+            *handlePtr->timskPtr |= (1 << TOIE0);
+            ////////////////////////////////////////////////
+            return (TIMER_OK);
+        }
+        // Remaining timer clock cycles relative to the start of current timer iteration:
+        timer_cycles = ((clockCycles - current_cycles) / prescaler) + timer_value;
+        if ((clockCycles - current_cycles) % prescaler) timer_cycles++;
+        max_timer_val = (1UL << (handlePtr->bitWidth == timerBitWidth_8 ? 8 : 16));
+        handlePtr->stopwatchTimeRemainingOverflows = timer_cycles / max_timer_val;
+        handlePtr->stopwatchTimeRemainder = (uint16_t)(timer_cycles % max_timer_val);
+
+        if (handlePtr->stopwatchTimeRemainingOverflows == 0)
+        {
+            // Note: For low prescalers it may be possible that the event is
+            // missed in case of a high ocra value, i.e. the timer overflows before it was
+            // checked if it was greater than ocra. This case is handled in the TOV
+            // handler when stopwatchTimeRemainingOverflows is 0 before decrementation.
+            timerSetOcraRegister (handlePtr, handlePtr->stopwatchTimeRemainder);
+            *handlePtr->tifrPtr = (1 << OCF0A); // clear output compare match interrupt flag
+            // Handle the case that the output compare match has just been missed:
+            timer_value = (handlePtr->bitWidth == timerBitWidth_8) ?
+                            *handlePtr->tcnt.uint8Ptr :
+                            *handlePtr->tcnt.uint16Ptr;
+            if (timer_value >= handlePtr->stopwatchTimeRemainder)
+            {
+                callbackPtr(callbackArgPtr);
+                handlePtr->stopwatchTimeCallbackPtr = NULL;
+                handlePtr->stopwatchTimeCallbackArgPtr = NULL;
+                *handlePtr->timskPtr |= (1 << TOIE0);
+                ////////////////////////////////////////////////
+                return (TIMER_OK);
+            }
+            // Enable output compare match interrupt:
+            timsk |= (1 << OCIE0A);
+        }
+        timsk |= (1 << TOIE0);
+        *handlePtr->timskPtr |= timsk;
+        ////////////////////////////////////////////////
+        return (TIMER_OK);
+    }
 }
 
 
@@ -1936,7 +2250,6 @@ ISR (TIMER2_OVF_vect, ISR_BLOCK)
     return;
 }
 
-#if TIMER_ENABLE_COUNTDOWN
 /*!
 *******************************************************************************
 ** \brief   ISR for timer 0 output compare match.
@@ -1978,5 +2291,4 @@ ISR (TIMER2_COMPA_vect, ISR_BLOCK)
     timerOutputCompareMatchHandler(&timerHandleArr[2]);
     return;
 }
-#endif // TIMER_ENABLE_COUNTDOWN
 

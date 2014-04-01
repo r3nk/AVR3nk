@@ -18,6 +18,7 @@
 
 #include <stdint.h>
 
+
 //*****************************************************************************
 //*************************** DEFINES AND MACROS ******************************
 //*****************************************************************************
@@ -33,8 +34,8 @@
 #endif
 
 //! Switch to enable the countdown feature (requires additional 60 bytes in RAM).
-#ifndef TIMER_ENABLE_COUNTDOWN
-#define TIMER_ENABLE_COUNTDOWN      1
+#ifndef TIMER_WITH_COUNTDOWN
+#define TIMER_WITH_COUNTDOWN        0
 #endif
 
 //! A smaller value increases countdown precision at the cost of generated interrupts.
@@ -61,6 +62,12 @@
 
 /*! The set up wave generation mode is not suited for the operation. */
 #define TIMER_ERR_INCOMPATIBLE_WGM          TIMER_ERR_BASE - 3
+
+/*! The stopwatch is disabled. */
+#define TIMER_ERR_STOPWATCH_DISABLED        TIMER_ERR_BASE - 4
+
+/*! There would be a timer resource conflict if the function was executed. */
+#define TIMER_ERR_RESOURCE_CONFLICT         TIMER_ERR_BASE - 5
 
 
 //*****************************************************************************
@@ -127,9 +134,16 @@ typedef void (*TIMER_CallbackT) (void* optArgPtr);
 /*! Defines whether the timer keeps track of elapsed system clock cycles. */
 typedef enum
 {
-    TIMER_Stopwatch_Off = 0,
-    TIMER_Stopwatch_On
-} TIMER_StopwatchEnableT;
+    TIMER_Stopwatch_Disable = 0,
+    TIMER_Stopwatch_Enable
+} TIMER_StopwatchEnableDisableT;
+
+/*! Defines whether to reset the stopwatch. */
+typedef enum
+{
+    TIMER_Stopwatch_NoReset = 0,
+    TIMER_Stopwatch_Reset
+} TIMER_StopwatchResetT;
 
 
 //*****************************************************************************
@@ -166,22 +180,29 @@ int8_t TIMER_SetClockPrescaler (TIMER_HandleT handle,
 
 uint16_t TIMER_GetClockPrescalerValue (TIMER_ClockPrescalerT prescaler);
 
-#if TIMER_ENABLE_COUNTDOWN
+#if TIMER_WITH_COUNTDOWN
 int8_t TIMER_StartCountdown (TIMER_HandleT handle,
                              TIMER_CallbackT callbackPtr,
-                             void* optArgPtr,
+                             void* callbackArgPtr,
                              uint16_t timeMs,
                              uint16_t numberOfExecutions);
-#endif // TIMER_ENABLE_COUNTDOWN
+#endif // TIMER_WITH_COUNTDOWN
 
-int8_t TIMER_ResetStopwatch (TIMER_HandleT handle,
-                             TIMER_StopwatchEnableT stopwatchEnable);
+int8_t TIMER_EnableDisableStopwatch (TIMER_HandleT handle,
+                                     TIMER_StopwatchEnableDisableT enableDisable);
 
 int8_t TIMER_GetStopwatchSystemClockCycles (TIMER_HandleT handle,
-                                            uint32_t* clockCycles);
+                                            uint32_t* clockCycles,
+                                            TIMER_StopwatchResetT stopwatchReset);
 
 int8_t TIMER_GetStopwatchTimeMs (TIMER_HandleT handle,
-                                 uint32_t* timeMs);
+                                 uint32_t* timeMs,
+                                 TIMER_StopwatchResetT stopwatchReset);
+
+int8_t TIMER_SetStopwatchTimeCallback(TIMER_HandleT handle,
+                                      TIMER_CallbackT callbackPtr,
+                                      void* callbackArgPtr,
+                                      uint32_t clockCycles);
 
 #endif
 
