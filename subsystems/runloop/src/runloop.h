@@ -25,6 +25,11 @@
 //*************************** DEFINES AND MACROS ******************************
 //*****************************************************************************
 
+//! CPU clock frequency
+#ifndef F_CPU
+#define F_CPU                       18432000
+#endif
+
 //! Maximum number of tasks that can be scheduled at the same time.
 #ifndef RUNLOOP_MAX_NUMBER_OF_TASKS
 #define RUNLOOP_MAX_NUMBER_OF_TASKS         10
@@ -85,8 +90,8 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
 int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
                         void* callbackArgPtr,
                         uint16_t numberOfExecutions,
-                        uint16_t periodMs,
-                        uint16_t initialDelayMs);
+                        uint32_t periodMs,
+                        uint32_t initialDelayMs);
 
 void RUNLOOP_Run (void);
 

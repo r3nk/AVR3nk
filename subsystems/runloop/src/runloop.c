@@ -34,6 +34,25 @@
 **          in the runloop is specified by the macro
 **          RUNLOOP_MAX_NUMBER_OF_TASKS.
 **
+**          The runloop is not subject to any systematic timing drifts as
+**          it makes use of a continuously running timer.
+**          However, the execution of a task may be subject to a timing jitter,
+**          which depends mainly on two factors:
+**          - If the system clock frequency is not a multiple of 1024000 Hz
+**              (e.g., 18432000 Hz = 18 * 1024000 Hz), the underlying timer does
+**              not pass the 1ms boundaries at clock cycles multiple of the
+**              prescaler because the milliseconds are not aligned with the
+**              timer's prescaled clock. Hence, a task may be delayed
+**              by up to "prescaler" system clock cycles even if no other tasks
+**              are running. If this is an issue, a crystal/oscillator whose
+**              frequency is a multiple of 1024000 Hz should be used.
+**              Alternatively, the jitter can be reduced by using a smaller
+**              timer prescaler at the cost of additional interrupts, which
+**              may slow down the MCU a bit.
+**          - If multiple tasks are running and the scheduling times of two
+**              tasks overlap, the second task will be delayed until the first
+**              task has finished execution.
+**
 ** \author  Robin Klose
 **
 ** Copyright (C) 2014-2014 Robin Klose
@@ -82,8 +101,8 @@ typedef struct runloopTask
     RUNLOOP_CallbackT callbackPtr;
     void* callbackArgPtr;
     uint16_t remainingExecutions;
-    uint16_t timeToNextExecutionMs;
-    uint16_t periodMs;
+    uint32_t cyclesToNextExecution;
+    uint32_t cyclesPerPeriod;
     runloopTaskStateT state : 2;
 } runloopTaskT;
 
@@ -110,7 +129,7 @@ static struct RUNLOOP_State
     uint8_t initialized : 1;
     volatile uint8_t running : 1;
     volatile uint8_t flagCmdl : 1;
-    volatile uint8_t flagCountdown : 1;
+    volatile uint8_t flagStopwatch : 1;
     volatile uint8_t flagTaskAdded : 1;
     TIMER_TimerIdT timerId : 2;
 } runloopHandle;
@@ -121,11 +140,11 @@ static struct RUNLOOP_State
 //*****************************************************************************
 
 static void runloopEnterCmdl (void* optArgPtr);
-static void runloopCountdownCallback (void* optArgPtr);
-static void runloopActivateNewTasks (uint32_t elapsedTimeMs);
-static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs);
+static void runloopStopwatchCallback (void* optArgPtr);
+static void runloopActivateNewTasks (uint32_t elapsedCycles);
+static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles);
 #if RUNLOOP_DEBUG
-static void runloopPrintTask(uint8_t ii, uint32_t elapsedTimeMs, runloopTaskT* taskPtr);
+static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* taskPtr);
 #endif
 
 
@@ -162,9 +181,9 @@ static void runloopEnterCmdl (void* optArgPtr)
 **
 *******************************************************************************
 */
-static void runloopCountdownCallback (void* optArgPtr)
+static void runloopStopwatchCallback (void* optArgPtr)
 {
-    runloopHandle.flagCountdown = 1;
+    runloopHandle.flagStopwatch = 1;
     return;
 }
 
@@ -172,26 +191,31 @@ static void runloopCountdownCallback (void* optArgPtr)
 *******************************************************************************
 ** \brief   Marks all new tasks as active, which makes them executable.
 **
-** \param   elapsedTimeMs   Time in milliseconds since
+** \param   elapsedCycles   Approximate number of system clock cycles since
 **                          runloopUpdateAndExecuteTasks() was called last.
-**                          It is needed to add an offset to the execution
+**                          It is needed here to add an offset to the execution
 **                          time, which is subtracted again before execution.
 **
 *******************************************************************************
 */
-static void runloopActivateNewTasks (uint32_t elapsedTimeMs)
+static void runloopActivateNewTasks (uint32_t elapsedCycles)
 {
-    uint8_t ii = 0;
-
-    // Reset the flag "task added":
-    runloopHandle.flagTaskAdded = 0;
-
-    for (ii = 0; ii < RUNLOOP_MAX_NUMBER_OF_TASKS; ii++)
+#if RUNLOOP_INTERRUPT_SAFETY
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+#endif
     {
-        if (runloopTaskSlotArr[ii].state == runloopTaskStateNew)
+        uint8_t ii = 0;
+
+        // Reset the flag "task added":
+        runloopHandle.flagTaskAdded = 0;
+
+        for (ii = 0; ii < RUNLOOP_MAX_NUMBER_OF_TASKS; ii++)
         {
-            runloopTaskSlotArr[ii].state = runloopTaskStateActive;
-            runloopTaskSlotArr[ii].timeToNextExecutionMs += (uint16_t)elapsedTimeMs;
+            if (runloopTaskSlotArr[ii].state == runloopTaskStateNew)
+            {
+                runloopTaskSlotArr[ii].state = runloopTaskStateActive;
+                runloopTaskSlotArr[ii].cyclesToNextExecution += elapsedCycles;
+            }
         }
     }
     return;
@@ -202,27 +226,26 @@ static void runloopActivateNewTasks (uint32_t elapsedTimeMs)
 ** \brief   Executes all tasks ready to run.
 **
 **          This function executes all tasks that are ready to run.
-**          If a task has been executed for the last time, its slot will
-**          be freed for new tasks.
+**          If a task is executed for the last time, its slot will be freed.
 **          This function also updates the runloopTaskHeadPtr, which points
 **          to the task with the smallest time to its next execution.
 **
-** \param   elapsedTimeMs   Time in milliseconds since this function was
-**                          called the last time.
+** \param   elapsedCycles   Approxmiate number of system clock cycles since this
+**                          function was called the last time.
 **
 ** \return  - 0 if no tasks were executed
 **          - 1 if at least one task was executed
 **
 *******************************************************************************
 */
-static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs)
+static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
 {
     runloopTaskT* task_ptr = NULL;
     runloopTaskT* task_head_ptr = NULL;
     uint8_t ii = 0;
     int8_t result = 0;
     int8_t task_was_executed = 0;
-    uint32_t elapsed_time_overdue = 0;
+    uint32_t elapsed_cycles_overdue = 0;
 
     for (ii = 0; ii < RUNLOOP_MAX_NUMBER_OF_TASKS; ii++)
     {
@@ -230,12 +253,12 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs)
         {
             task_ptr = &runloopTaskSlotArr[ii];
 #if RUNLOOP_DEBUG
-            runloopPrintTask(ii, elapsedTimeMs, task_ptr);
+            runloopPrintTask(ii, elapsedCycles, task_ptr);
 #endif
-            if (task_ptr->timeToNextExecutionMs > elapsedTimeMs)
+            if (task_ptr->cyclesToNextExecution > elapsedCycles)
             {
                 // Update execution time:
-                task_ptr->timeToNextExecutionMs -= elapsedTimeMs;
+                task_ptr->cyclesToNextExecution -= elapsedCycles;
             }
             else
             {
@@ -268,15 +291,15 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs)
                     if (task_ptr->remainingExecutions)
                     {
                         // Update execution time:
-                        elapsed_time_overdue = elapsedTimeMs - task_ptr->timeToNextExecutionMs;
-                        if (task_ptr->periodMs > elapsed_time_overdue)
+                        elapsed_cycles_overdue = elapsedCycles - task_ptr->cyclesToNextExecution;
+                        if (task_ptr->cyclesPerPeriod > elapsed_cycles_overdue)
                         {
-                            task_ptr->timeToNextExecutionMs = \
-                                task_ptr->periodMs - elapsed_time_overdue;
+                            task_ptr->cyclesToNextExecution = \
+                                task_ptr->cyclesPerPeriod - elapsed_cycles_overdue;
                         }
                         else
                         {
-                            task_ptr->timeToNextExecutionMs = 0;
+                            task_ptr->cyclesToNextExecution = 0;
                         }
                     }
                     else
@@ -295,7 +318,7 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs)
             // (also consider the case that the task became invalidated):
             if ((task_ptr->state == runloopTaskStateActive)
             &&  (  (task_head_ptr == NULL)
-                || (task_ptr->timeToNextExecutionMs < task_head_ptr->timeToNextExecutionMs)))
+                || (task_ptr->cyclesToNextExecution < task_head_ptr->cyclesToNextExecution)))
             {
                 task_head_ptr = task_ptr;
             }
@@ -306,18 +329,22 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedTimeMs)
 }
 
 #if RUNLOOP_DEBUG
-static void runloopPrintTask(uint8_t ii, uint32_t elapsedTimeMs, runloopTaskT* taskPtr)
+static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* taskPtr)
 {
-    printf("Task %02d - %d ms el. - cb: %04x ar: %04x re: %5d te: %5d pd: %5d st: %d\n",
-            ii,
-            elapsedTimeMs,
-            (uint16_t)taskPtr->callbackPtr,
-            (uint16_t)taskPtr->callbackArgPtr,
-            taskPtr->remainingExecutions,
-            taskPtr->timeToNextExecutionMs,
-            taskPtr->periodMs,
-            taskPtr->state);
+    //printf("el.: %lu\n", elapsedCycles);
+    ///*
+    printf("\n");
+    printf("================\n");
+    printf("Task %02u - Cycles elapsed: %lu\n", ii, elapsedCycles);
+    printf("================\n");
+    printf("callbackPtr:    %04x\n", (uint16_t)taskPtr->callbackPtr);
+    printf("callbackArgPtr: %04x\n", (uint16_t)taskPtr->callbackArgPtr);
+    printf("remainingExec.: %u\n",   taskPtr->remainingExecutions);
+    printf("cyclesToNextE.: %lu\n",  taskPtr->cyclesToNextExecution);
+    printf("cyclesPerPd.:   %lu\n",  taskPtr->cyclesPerPeriod);
+    printf("state:          %u\n",   taskPtr->state);
     return;
+    // */
 }
 #endif
 
@@ -437,6 +464,9 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
 *******************************************************************************
 ** \brief   Add a new task to the RUNLOOP.
 **
+** \note    The maximum value that can be passed through periodMs and
+**          initialDelayMs is (2^32 - 1) / (F_CPU / 1000) milliseconds.
+**
 ** \param   callbackPtr         Defines the task to be executed.
 ** \param   callbackArgPtr      The argument that will be passed to the callback.
 **                              May be NULL if not required by the callback.
@@ -459,8 +489,8 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
 int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
                         void* callbackArgPtr,
                         uint16_t numberOfExecutions,
-                        uint16_t periodMs,
-                        uint16_t initialDelayMs)
+                        uint32_t periodMs,
+                        uint32_t initialDelayMs)
 {
     uint8_t ii = 0;
     runloopTaskT* task_ptr = NULL;
@@ -475,6 +505,9 @@ int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
+        // TODO: if runloopTaskHeadPtr == NULL --> reset stopwatch
+        // TODO: if initialDelayMs + stopwatch_cycles > UINT32_MAX -> overflow error
+
         // Search empty task slot:
         for (ii = 0; ii < RUNLOOP_MAX_NUMBER_OF_TASKS; ii++)
         {
@@ -501,8 +534,8 @@ int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
         // Finite execution:
         task_ptr->remainingExecutions = numberOfExecutions;
     }
-    task_ptr->timeToNextExecutionMs = initialDelayMs;
-    task_ptr->periodMs = periodMs;
+    task_ptr->cyclesToNextExecution = initialDelayMs * ((F_CPU) / 1000UL);
+    task_ptr->cyclesPerPeriod = periodMs * ((F_CPU) / 1000UL);
 
     runloopHandle.flagTaskAdded = 1;
 
@@ -522,20 +555,29 @@ int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
 */
 void RUNLOOP_Run (void)
 {
-    int8_t task_was_executed = 0;
-    uint32_t stopwatch_time = 0;
-
-    // Reset/enable the timer's stopwatch:
-    TIMER_ResetStopwatch(runloopTimerHandle,
-                         TIMER_Stopwatch_On);
+    uint8_t task_was_executed = 0;
+    uint32_t stopwatch_cycles = 0;
 
     // Reset flags:
     runloopHandle.running = 1;
     runloopHandle.flagCmdl = 0;
-    runloopHandle.flagCountdown = 0;
+    runloopHandle.flagStopwatch = 0;
+
+    // Stop and reset the timer:
+    TIMER_Stop(runloopTimerHandle, TIMER_Stop_ImmediatelyAndReset);
+
+    // Reset and enable the timer's stopwatch:
+    TIMER_EnableDisableStopwatch(runloopTimerHandle, TIMER_Stopwatch_Enable);
+
+    // Set the clock prescaler to maximum (generates least interrupts):
+    // TODO: parameterize?
+    TIMER_SetClockPrescaler(runloopTimerHandle, TIMER_ClockPrescaler_1024);
+
+    // Start the timer:
+    TIMER_Start(runloopTimerHandle);
 
     // RUNLOOP execution can be halted by RUNLOOP_Stop():
-    while ( runloopHandle.running )
+    while (runloopHandle.running)
     {
         // Enable watchdog timer:
         wdt_enable(WDTO_1S);
@@ -544,64 +586,48 @@ void RUNLOOP_Run (void)
         while (runloopHandle.running
         &&    (runloopHandle.flagCmdl == 0))
         {
-            // The timer is stopped at this point.
-
-            // Set the clock prescaler to maximum (generates least interrupts):
-            TIMER_SetClockPrescaler(runloopTimerHandle,
-                                             TIMER_ClockPrescaler_1024);
-
             do
             {
                 // Get the elapsed time measured by the stopwatch:
-                TIMER_GetStopwatchTimeMs(runloopTimerHandle, &stopwatch_time);
+                TIMER_GetStopwatchSystemClockCycles(runloopTimerHandle,
+                                                    &stopwatch_cycles,
+                                                    TIMER_Stopwatch_Reset);
 
-#if RUNLOOP_INTERRUPT_SAFETY
-                ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-#endif
+                // Activate new tasks:
+                if (runloopHandle.flagTaskAdded)
                 {
-                    // Activate new tasks:
-                    if (runloopHandle.flagTaskAdded)
-                    {
-                        runloopActivateNewTasks(stopwatch_time);
-                    }
-
-                    // Reset the stopwatch:
-                    TIMER_ResetStopwatch(runloopTimerHandle,
-                                         TIMER_Stopwatch_On);
+                    runloopActivateNewTasks(stopwatch_cycles);
                 }
-
-                // Start the stopwatch (runs concurrently to executing tasks):
-                TIMER_Start(runloopTimerHandle);
 
                 // Update the execution times of all tasks and
                 // execute all tasks whose execution times have expired:
-                task_was_executed = runloopUpdateAndExecuteTasks(stopwatch_time);
+                task_was_executed = runloopUpdateAndExecuteTasks(stopwatch_cycles);
 
                 // Reset watchdog:
                 wdt_reset();
-
-                // Stop the stopwatch:
-                TIMER_Stop(runloopTimerHandle, TIMER_Stop_ImmediatelyAndReset);
 
             } while (runloopHandle.running
               &&     (task_was_executed || runloopHandle.flagTaskAdded));
             // as long as at least one task was executed or added
 
             // Reset the countdown flag:
-            runloopHandle.flagCountdown = 0;
+            runloopHandle.flagStopwatch = 0;
 
-            // Set the countdown to the execution time of the next task.
-            // The stopwatch does also run:
-            TIMER_StartCountdown(runloopTimerHandle,
-                                 runloopCountdownCallback,
-                                 NULL,
-                                 runloopTaskHeadPtr->timeToNextExecutionMs,
-                                 1);
+            // Make the timer's stopwatch notify the runloop when the next
+            // execution time is reached:
+            if (runloopTaskHeadPtr)
+            {
+                TIMER_SetStopwatchTimeCallback \
+                                    (runloopTimerHandle,
+                                     runloopStopwatchCallback,
+                                     NULL,
+                                     runloopTaskHeadPtr->cyclesToNextExecution);
+            }
 
             // Sleep while the runloop is idle:
             while ((runloopHandle.running)
             &&     (runloopHandle.flagCmdl == 0)
-            &&     (runloopHandle.flagCountdown == 0)
+            &&     (runloopHandle.flagStopwatch == 0)
             &&     (runloopHandle.flagTaskAdded == 0))
             {
                 // Reset watchdog:
@@ -631,23 +657,26 @@ void RUNLOOP_Run (void)
                 sleep_disable();
                 // */
             }
-            if (runloopHandle.flagCountdown == 0)
-            {
-                // If the countdown flag is set, the timer is already stopped
-                TIMER_Stop(runloopTimerHandle, TIMER_Stop_ImmediatelyAndReset);
-            }
         }
         if (runloopHandle.flagCmdl)
         {
             // Enter interactive command line interface:
-            runloopHandle.flagCmdl = 0;
+            TIMER_Stop(runloopTimerHandle, TIMER_Stop_Immediately);
             wdt_disable();
             CMDL_Run();
             UART_TxFlush(runloopUartHandle);
+            runloopHandle.flagCmdl = 0;
+            TIMER_Start(runloopTimerHandle);
         }
     }
     // Disable watchdog timer:
     wdt_disable();
+
+    // Disable the timer's stopwatch:
+    TIMER_EnableDisableStopwatch(runloopTimerHandle, TIMER_Stopwatch_Disable);
+
+    // Stop and reset the timer:
+    TIMER_Stop(runloopTimerHandle, TIMER_Stop_ImmediatelyAndReset);
     return;
 }
 
