@@ -92,6 +92,7 @@ typedef enum runloopTaskState
 {
     runloopTaskStateEmpty = 0,
     runloopTaskStateNew,
+    runloopTaskStateReady,
     runloopTaskStateActive
 } runloopTaskStateT;
 
@@ -213,8 +214,7 @@ static void runloopActivateNewTasks (uint32_t elapsedCycles)
         {
             if (runloopTaskSlotArr[ii].state == runloopTaskStateNew)
             {
-                runloopTaskSlotArr[ii].state = runloopTaskStateActive;
-                runloopTaskSlotArr[ii].cyclesToNextExecution += elapsedCycles;
+                runloopTaskSlotArr[ii].state = runloopTaskStateReady;
             }
         }
     }
@@ -223,7 +223,8 @@ static void runloopActivateNewTasks (uint32_t elapsedCycles)
 
 /*!
 *******************************************************************************
-** \brief   Executes all tasks ready to run.
+** \brief   Updates all ready and active tasks and executes them if their
+**          time to execution has elapsed.
 **
 **          This function executes all tasks that are ready to run.
 **          If a task is executed for the last time, its slot will be freed.
@@ -233,8 +234,8 @@ static void runloopActivateNewTasks (uint32_t elapsedCycles)
 ** \param   elapsedCycles   Approxmiate number of system clock cycles since this
 **                          function was called the last time.
 **
-** \return  - 0 if no tasks were executed
-**          - 1 if at least one task was executed
+** \return  - The number of tasks that were executed. Thus, if no tasks were
+**            executed, it returns 0.
 **
 *******************************************************************************
 */
@@ -244,11 +245,12 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
     runloopTaskT* task_head_ptr = NULL;
     uint8_t ii = 0;
     int8_t result = 0;
-    int8_t task_was_executed = 0;
+    int8_t tasks_executed = 0;
     uint32_t elapsed_cycles_overdue = 0;
 
     for (ii = 0; ii < RUNLOOP_MAX_NUMBER_OF_TASKS; ii++)
     {
+        task_ptr = NULL;
         if (runloopTaskSlotArr[ii].state == runloopTaskStateActive)
         {
             task_ptr = &runloopTaskSlotArr[ii];
@@ -264,16 +266,13 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
             {
                 // Execute task:
                 result = task_ptr->callbackPtr(task_ptr->callbackArgPtr);
-
-                // Update return value:
-                task_was_executed = 1;
-
+                tasks_executed++;
                 if (result != 0)
                 {
-                    // Task returned with error code, invalidate task:
 #if RUNLOOP_DEBUG
                     printf("[RUNLOOP] Task error: %d\n", result);
 #endif
+                    // Task returned with error code, invalidate task:
 #if RUNLOOP_INTERRUPT_SAFETY
                     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
@@ -299,6 +298,7 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                         }
                         else
                         {
+                            // Break the period and align the task anew:
                             task_ptr->cyclesToNextExecution = 0;
                         }
                     }
@@ -314,18 +314,64 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                     }
                 }
             }
-            // Update the task head pointer
-            // (also consider the case that the task became invalidated):
-            if ((task_ptr->state == runloopTaskStateActive)
-            &&  (  (task_head_ptr == NULL)
-                || (task_ptr->cyclesToNextExecution < task_head_ptr->cyclesToNextExecution)))
+        }
+        else if (runloopTaskSlotArr[ii].state == runloopTaskStateReady)
+        {
+            task_ptr = &runloopTaskSlotArr[ii];
+#if RUNLOOP_DEBUG
+            runloopPrintTask(ii, elapsedCycles, task_ptr);
+#endif
+            task_ptr->state = runloopTaskStateActive;
+
+            if (task_ptr->cyclesToNextExecution == 0)
             {
-                task_head_ptr = task_ptr;
+                // Execute task:
+                result = task_ptr->callbackPtr(task_ptr->callbackArgPtr);
+                tasks_executed++;
+                task_ptr->cyclesToNextExecution = task_ptr->cyclesPerPeriod;
+                if (result != 0)
+                {
+#if RUNLOOP_DEBUG
+                    printf("[RUNLOOP] Task error: %d\n", result);
+#endif
+                    // Task returned with error code, invalidate task:
+#if RUNLOOP_INTERRUPT_SAFETY
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+#endif
+                    {
+                        memset(task_ptr, 0, sizeof(runloopTaskT));
+                    }
+                }
+                else
+                {
+                    // Update task information:
+                    if (task_ptr->remainingExecutions < UINT16_MAX)
+                    {
+                        task_ptr->remainingExecutions--;
+                    }
+                    if (task_ptr->remainingExecutions == 0)
+                    {
+                        // Task was executed only once, invalidate task:
+#if RUNLOOP_INTERRUPT_SAFETY
+                        ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+#endif
+                        {
+                            memset(task_ptr, 0, sizeof(runloopTaskT));
+                        }
+                    }
+                }
             }
+        }
+        // Update the task head pointer:
+        if ((task_ptr)
+        &&  (  (task_head_ptr == NULL)
+            || (task_ptr->cyclesToNextExecution < task_head_ptr->cyclesToNextExecution)))
+        {
+            task_head_ptr = task_ptr;
         }
     }
     runloopTaskHeadPtr = task_head_ptr;
-    return task_was_executed;
+    return tasks_executed;
 }
 
 #if RUNLOOP_DEBUG
@@ -337,12 +383,12 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
     printf("================\n");
     printf("Task %02u - Cycles elapsed: %lu\n", ii, elapsedCycles);
     printf("================\n");
-    printf("callbackPtr:    %04x\n", (uint16_t)taskPtr->callbackPtr);
-    printf("callbackArgPtr: %04x\n", (uint16_t)taskPtr->callbackArgPtr);
-    printf("remainingExec.: %u\n",   taskPtr->remainingExecutions);
-    printf("cyclesToNextE.: %lu\n",  taskPtr->cyclesToNextExecution);
-    printf("cyclesPerPd.:   %lu\n",  taskPtr->cyclesPerPeriod);
-    printf("state:          %u\n",   taskPtr->state);
+    printf("callbackPtr:    0x%04x\n", (uint16_t)taskPtr->callbackPtr);
+    printf("callbackArgPtr: 0x%04x\n", (uint16_t)taskPtr->callbackArgPtr);
+    printf("remainingExec.: %u\n",     taskPtr->remainingExecutions);
+    printf("cyclesToNextE.: %lu\n",    taskPtr->cyclesToNextExecution);
+    printf("cyclesPerPd.:   %lu\n",    taskPtr->cyclesPerPeriod);
+    printf("state:          %u\n",     taskPtr->state);
     return;
     // */
 }
@@ -383,6 +429,7 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 **
 *******************************************************************************
 */
+// TODO: timerClockPrescaler, CMDL while running?
 int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
                      UART_HandleT uartHandle)
 {
@@ -505,9 +552,6 @@ int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
     {
-        // TODO: if runloopTaskHeadPtr == NULL --> reset stopwatch
-        // TODO: if initialDelayMs + stopwatch_cycles > UINT32_MAX -> overflow error
-
         // Search empty task slot:
         for (ii = 0; ii < RUNLOOP_MAX_NUMBER_OF_TASKS; ii++)
         {
