@@ -40,13 +40,14 @@
 //********************** LOCAL FUNCTION DECLARATIONS **************************
 //*****************************************************************************
 
-static int8_t appInit(void);
-static int    appStdioPut(char chr, FILE* streamPtr);
-static int    appStdioGet(FILE* streamPtr);
-static int8_t appToggleLED (void* optArgPtr);
-static void   appAddRunloopTaskViaKey(void* optArgPtr);
-static void   appAddRunloopTaskViaCmdl(uint8_t argc, char* argv[]);
-
+static int8_t  appInit(void);
+static int     appStdioPut(char chr, FILE* streamPtr);
+static int     appStdioGet(FILE* streamPtr);
+static void    appTaskErrorCallback (uint8_t taskId, uint8_t errorCode);
+static void    appSyncErrorCallback (uint8_t taskId, uint16_t dropCount);
+static uint8_t appToggleLED (void* optArgPtr);
+static void    appAddRunloopTaskViaKey(void* optArgPtr);
+static void    appAddRunloopTaskViaCmdl(uint8_t argc, char* argv[]);
 
 //*****************************************************************************
 //**************************** LOCAL VARIABLES ********************************
@@ -146,7 +147,10 @@ static int8_t appInit(void)
 
     // Initialize RUNLOOP:
     result = RUNLOOP_Init(TIMER_TimerId_2,
-                          appUartHandle);
+                          TIMER_ClockPrescaler_1024,
+                          appUartHandle,
+                          appTaskErrorCallback,
+                          appSyncErrorCallback);
     if (result != RUNLOOP_OK)
     {
         printf("RUNLOOP_Init: %d\n", result);
@@ -201,11 +205,44 @@ static int appStdioGet(FILE* streamPtr)
 
 /*!
 *******************************************************************************
-** \brief   Toggle the application's LEDj
+** \brief   Callback function that will be executed by the runloop when
+**          a task returns with an error code other than RUNLOOP_OK
+**          or RUNLOOP_OK_TASK_ABORT.
+**
+** \param   taskId      Contains the id of the task.
+** \param   errorCode   Contains the error code returned by the task.
 **
 *******************************************************************************
 */
-static int8_t appToggleLED (void* optArgPtr)
+static void appTaskErrorCallback (uint8_t taskId, uint8_t errorCode)
+{
+    printf ("Task error. Task ID: %u Return code: %u\n", taskId, errorCode);
+    return;
+}
+
+/*!
+*******************************************************************************
+** \brief   Callback function that will be executed by the runloop when
+**          it loses synchronization and needs to skip task executions.
+**
+** \param   taskId      Contains the id of the task that was skipped.
+** \param   dropCount   Number of executions that were skipped.
+**
+*******************************************************************************
+*/
+static void appSyncErrorCallback (uint8_t taskId, uint16_t dropCount)
+{
+    printf(" Sync error. Task ID: %u Drop count: %u\n", taskId, dropCount);
+    return;
+}
+
+/*!
+*******************************************************************************
+** \brief   Toggle the application's LED
+**
+*******************************************************************************
+*/
+static uint8_t appToggleLED (void* optArgPtr)
 {
     if (appPinIsHigh)
     {
@@ -217,7 +254,7 @@ static int8_t appToggleLED (void* optArgPtr)
         SET_HIGH(APP_LED);
         appPinIsHigh = 1;
     }
-    return 0;
+    return (RUNLOOP_OK);
 }
 
 /*!
@@ -231,14 +268,20 @@ static int8_t appToggleLED (void* optArgPtr)
 static void appAddRunloopTaskViaKey(void* optArgPtr)
 {
     int8_t result = 0;
+    uint8_t task_id = 0;
     result = RUNLOOP_AddTask(appToggleLED,
                              NULL,
                              10,     // number of executions
                              500,    // period in ms
-                             0);     // initial delay in ms
-    if (result != RUNLOOP_OK)
+                             0,      // initial delay in ms
+                             &task_id);  // task id pointer
+    if (result != (RUNLOOP_OK))
     {
-        printf("RUNLOOP_AddTask: %d\n", result);
+        printf("Error in RUNLOOP_AddTask(): %d\n", result);
+    }
+    else
+    {
+        printf("Task added. Task ID: %u\n", task_id);
     }
     return;
 }
@@ -257,6 +300,7 @@ static void appAddRunloopTaskViaKey(void* optArgPtr)
 static void appAddRunloopTaskViaCmdl(uint8_t argc, char* argv[])
 {
     int8_t result = 0;
+    uint8_t task_id = 0;
 
     if (argc != 4)
     {
@@ -267,10 +311,15 @@ static void appAddRunloopTaskViaCmdl(uint8_t argc, char* argv[])
                              NULL,
                              (uint16_t)strtoul(argv[1], NULL, 0),
                              strtoul(argv[2], NULL, 0),
-                             strtoul(argv[3], NULL, 0));
-    if (result != RUNLOOP_OK)
+                             strtoul(argv[3], NULL, 0),
+                             &task_id);
+    if (result != (RUNLOOP_OK))
     {
-        printf("RUNLOOP_AddTask: %d\n", result);
+        printf("Error in RUNLOOP_AddTask(): %d\n", result);
+    }
+    else
+    {
+        printf("Task added. Task ID: %u\n", task_id);
     }
     return;
 }
