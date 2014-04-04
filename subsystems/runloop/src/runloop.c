@@ -99,7 +99,7 @@ typedef enum runloopTaskState
 // Task structure:
 typedef struct runloopTask
 {
-    RUNLOOP_CallbackT callbackPtr;
+    RUNLOOP_TaskCallbackT callbackPtr;
     void* callbackArgPtr;
     uint16_t remainingExecutions;
     uint32_t cyclesToNextExecution;
@@ -135,6 +135,12 @@ static struct RUNLOOP_State
     TIMER_TimerIdT timerId : 2;
 } runloopHandle;
 
+// Callback that will be executed on task errors:
+static RUNLOOP_TaskErrorCallbackT runloopTaskErrorCallback = NULL;
+
+// Callback that will be executed when task executions are dropped:
+static RUNLOOP_SyncErrorCallbackT runloopSyncErrorCallback = NULL;
+
 
 //*****************************************************************************
 //********************** LOCAL FUNCTION DECLARATIONS **************************
@@ -143,7 +149,7 @@ static struct RUNLOOP_State
 static void runloopEnterCmdl (void* optArgPtr);
 static void runloopStopwatchCallback (void* optArgPtr);
 static void runloopActivateNewTasks (uint32_t elapsedCycles);
-static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles);
+static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles);
 #if RUNLOOP_DEBUG
 static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* taskPtr);
 #endif
@@ -234,18 +240,18 @@ static void runloopActivateNewTasks (uint32_t elapsedCycles)
 ** \param   elapsedCycles   Approxmiate number of system clock cycles since this
 **                          function was called the last time.
 **
-** \return  - The number of tasks that were executed. Thus, if no tasks were
-**            executed, it returns 0.
+** \return  - The number of tasks that were executed. If no tasks are
+**            executed, it will return 0.
 **
 *******************************************************************************
 */
-static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
+static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
 {
     runloopTaskT* task_ptr = NULL;
     runloopTaskT* task_head_ptr = NULL;
     uint8_t ii = 0;
-    int8_t result = 0;
-    int8_t tasks_executed = 0;
+    uint8_t result = 0;
+    uint8_t tasks_executed = 0;
     uint32_t elapsed_cycles_overdue = 0;
 
     for (ii = 0; ii < RUNLOOP_MAX_NUMBER_OF_TASKS; ii++)
@@ -267,17 +273,23 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                 // Execute task:
                 result = task_ptr->callbackPtr(task_ptr->callbackArgPtr);
                 tasks_executed++;
-                if (result != 0)
+                if (result != RUNLOOP_OK)
                 {
 #if RUNLOOP_DEBUG
-                    printf("[RUNLOOP] Task error: %d\n", result);
+                    printf("[RUNLOOP] Task %u: %u\n", ii, result);
 #endif
-                    // Task returned with error code, invalidate task:
+                    // Task returned with RUNLOOP_OK_TASK_ABORT or with error code,
+                    // invalidate task:
 #if RUNLOOP_INTERRUPT_SAFETY
                     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
                     {
                         memset(task_ptr, 0, sizeof(runloopTaskT));
+                    }
+                    if ((result != RUNLOOP_OK_TASK_ABORT)
+                    &&  (runloopTaskErrorCallback))
+                    {
+                        runloopTaskErrorCallback(ii, result);
                     }
                 }
                 else
@@ -298,8 +310,16 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                         }
                         else
                         {
-                            // Break the period and align the task anew:
-                            task_ptr->cyclesToNextExecution = 0;
+                            // Skip one or more executions of the task, but re-align
+                            // the timing of the task to its previous pattern:
+                            task_ptr->cyclesToNextExecution = task_ptr->cyclesPerPeriod - \
+                                (elapsed_cycles_overdue % task_ptr->cyclesPerPeriod);
+                            if (runloopSyncErrorCallback)
+                            {
+                                // Execute error callback and give number of drops:
+                                runloopSyncErrorCallback(ii, (uint16_t) \
+                                    (elapsed_cycles_overdue / task_ptr->cyclesPerPeriod));
+                            }
                         }
                     }
                     else
@@ -329,17 +349,23 @@ static int8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                 result = task_ptr->callbackPtr(task_ptr->callbackArgPtr);
                 tasks_executed++;
                 task_ptr->cyclesToNextExecution = task_ptr->cyclesPerPeriod;
-                if (result != 0)
+                if (result != RUNLOOP_OK)
                 {
 #if RUNLOOP_DEBUG
-                    printf("[RUNLOOP] Task error: %d\n", result);
+                    printf("[RUNLOOP] Task %u: %u\n", ii, result);
 #endif
-                    // Task returned with error code, invalidate task:
+                    // Task returned with RUNLOOP_OK_TASK_ABORT or with error code,
+                    // invalidate task:
 #if RUNLOOP_INTERRUPT_SAFETY
                     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 #endif
                     {
                         memset(task_ptr, 0, sizeof(runloopTaskT));
+                    }
+                    if ((result != RUNLOOP_OK_TASK_ABORT)
+                    &&  (runloopTaskErrorCallback))
+                    {
+                        runloopTaskErrorCallback(ii, result);
                     }
                 }
                 else
@@ -403,6 +429,7 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 *******************************************************************************
 ** \brief   Initialize the RUNLOOP.
 **
+**          TODO: CMDL behavior
 **          This function also registers the 'q' key with a UART rx callback
 **          function that causes the RUNLOOP to enter an interactive
 **          commandline mode. If the CMDL subsystem has not been initialized
@@ -415,8 +442,42 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 **                      interrupts during operation. Timer 2, however,
 **                      is the only timer that allows to set the MCU into
 **                      extended standby while the RUNLOOP is idle.
+** \param   timerClockPrescaler
+**                      Specifies the clock prescaler for the timer.
+**                      It is highly recommended to set up the runloop with
+**                      TIMER_ClockPrescaler_1024 for efficiency. However,
+**                      if the system clock frequency F_CPU is not a multiple
+**                      of 1024 kHz, a lower prescaler may reduce the
+**                      timing jitter (on the precondition that the execution
+**                      times of tasks do not overlap). This may be helpful
+**                      in applications which require precise timing
+**                      intervals. Note that if F_CPU is a multiple of
+**                      1024 kHz, the duration of a millisecond is a multiple
+**                      of the timer's prescaled clock, so there is no need to
+**                      use a lower prescaler.
 ** \param   uartHandle  A valid UART handle that will be used to control
 **                      the RUNLOOP via keys and a commandline interface.
+** \param   taskErrorCallback
+**                      This argument allows to register a callback with the
+**                      runloop that is executed whenever a task returns
+**                      with an error code greater than 1. Note that the
+**                      error codes 0 and 1 have special meanings.
+**                      The error code 0 (RUNLOOP_OK) means that a task has
+**                      executed successfully. The error code 1
+**                      (RUNLOOP_OK_TASK_ABORT) means that a task
+**                      has executed successfully but that it should be
+**                      removed from the runloop. The callback receives
+**                      two arguments: the task id and the error code returned
+**                      by the task.
+** \param   syncErrorCallback
+**                      This argument allows to register a callback with the
+**                      runloop that is executed whenever a task is delayed
+**                      by more than its execution period. In this case,
+**                      the runloop will skip one or more executions of the
+**                      task. However, the runloop re-aligns future executions
+**                      of the task to its previous timing pattern, if possible.
+**                      The callback receives two arguments: the task id, and
+**                      the count of dropped executions.
 **
 ** \return
 **          - #RUNLOOP_OK on success.
@@ -429,13 +490,15 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 **
 *******************************************************************************
 */
-// TODO: timerClockPrescaler, CMDL while running?
+// TODO: CMDL while running?
 int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
-                     UART_HandleT uartHandle)
+                     TIMER_ClockPrescalerT timerClockPrescaler,
+                     UART_HandleT uartHandle,
+                     RUNLOOP_TaskErrorCallbackT taskErrorCallback,
+                     RUNLOOP_SyncErrorCallbackT syncErrorCallback)
 {
     int8_t result = 0;
 
-    TIMER_ClockPrescalerT clock_prescaler;
     TIMER_WaveGenerationT wave_generation_mode;
     TIMER_OutputModeT output_mode_A;
     TIMER_OutputModeT output_mode_B;
@@ -452,12 +515,11 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
     memset (&runloopHandle, 0, sizeof(runloopHandle));
 
     // Initialize timer:
-    clock_prescaler = TIMER_ClockPrescaler_1;
     wave_generation_mode = TIMER_WaveGeneration_NormalMode;
     output_mode_A = TIMER_OutputMode_NormalPortOperation;
     output_mode_B = TIMER_OutputMode_NormalPortOperation;
     runloopTimerHandle = TIMER_Init (timerId,
-                                     clock_prescaler,
+                                     timerClockPrescaler,
                                      wave_generation_mode,
                                      output_mode_A,
                                      output_mode_B);
@@ -501,6 +563,8 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
         }
     }
 
+    runloopTaskErrorCallback = taskErrorCallback;
+    runloopSyncErrorCallback = syncErrorCallback;
     runloopUartHandle = uartHandle;
     runloopHandle.timerId = timerId;
     runloopHandle.initialized = 1;
@@ -524,6 +588,9 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
 **                              Must be greater than 0.
 ** \param   initialDelayMs      Defines an initial delay before the task will
 **                              be executed for the first time.
+** \param   taskIdPtr           Receives a unique identifier of the task, which
+**                              may be used to identify tasks in the error
+**                              callbacks. The argument may be NULL if not needed.
 **
 ** \return
 **          - #RUNLOOP_OK on success.
@@ -533,11 +600,12 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
 **
 *******************************************************************************
 */
-int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
+int8_t RUNLOOP_AddTask (RUNLOOP_TaskCallbackT callbackPtr,
                         void* callbackArgPtr,
                         uint16_t numberOfExecutions,
                         uint32_t periodMs,
-                        uint32_t initialDelayMs)
+                        uint32_t initialDelayMs,
+                        uint8_t* taskIdPtr)
 {
     uint8_t ii = 0;
     runloopTaskT* task_ptr = NULL;
@@ -583,6 +651,9 @@ int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
 
     runloopHandle.flagTaskAdded = 1;
 
+    // Disclose task id:
+    *taskIdPtr = ii;
+
     return (RUNLOOP_OK);
 }
 
@@ -599,7 +670,7 @@ int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
 */
 void RUNLOOP_Run (void)
 {
-    uint8_t task_was_executed = 0;
+    uint8_t tasks_executed = 0;
     uint32_t stopwatch_cycles = 0;
 
     // Reset flags:
@@ -612,10 +683,6 @@ void RUNLOOP_Run (void)
 
     // Reset and enable the timer's stopwatch:
     TIMER_EnableDisableStopwatch(runloopTimerHandle, TIMER_Stopwatch_Enable);
-
-    // Set the clock prescaler to maximum (generates least interrupts):
-    // TODO: parameterize?
-    TIMER_SetClockPrescaler(runloopTimerHandle, TIMER_ClockPrescaler_1024);
 
     // Start the timer:
     TIMER_Start(runloopTimerHandle);
@@ -645,13 +712,13 @@ void RUNLOOP_Run (void)
 
                 // Update the execution times of all tasks and
                 // execute all tasks whose execution times have expired:
-                task_was_executed = runloopUpdateAndExecuteTasks(stopwatch_cycles);
+                tasks_executed = runloopUpdateAndExecuteTasks(stopwatch_cycles);
 
                 // Reset watchdog:
                 wdt_reset();
 
             } while (runloopHandle.running
-              &&     (task_was_executed || runloopHandle.flagTaskAdded));
+              &&     (tasks_executed || runloopHandle.flagTaskAdded));
             // as long as at least one task was executed or added
 
             // Reset the countdown flag:

@@ -30,7 +30,7 @@
 #define F_CPU                       18432000
 #endif
 
-//! Maximum number of tasks that can be scheduled at the same time.
+//! Maximum number of tasks that can be scheduled at the same time. Should be < 256.
 #ifndef RUNLOOP_MAX_NUMBER_OF_TASKS
 #define RUNLOOP_MAX_NUMBER_OF_TASKS         10
 #endif
@@ -58,6 +58,10 @@
 /*! RUNLOOP returns with no errors. */
 #define RUNLOOP_OK                          0
 
+/*! Special return value for tasks that return without error but that should
+**  be removed from the runloop. */
+#define RUNLOOP_OK_TASK_ABORT               1
+
 /*! A bad parameter has been passed. */
 #define RUNLOOP_ERR_BAD_PARAMETER           RUNLOOP_ERR_BASE + 0
 
@@ -75,9 +79,19 @@
 //******************************** DATA TYPES *********************************
 //*****************************************************************************
 
+/*! Signature of the task error callback. */
+typedef void (*RUNLOOP_TaskErrorCallbackT) (uint8_t taskId, uint8_t errorCode);
+
+/*! Signature of the synchronization error callback. */
+typedef void (*RUNLOOP_SyncErrorCallbackT) (uint8_t taskId, uint16_t dropCount);
+
 /*! The callback of a task takes an optional pointer as an argument
-** and returns an error code. */
-typedef int8_t (*RUNLOOP_CallbackT) (void* optArgPtr);
+** and returns an error code. If the task returns an error other than
+** RUNLOOP_OK, it will be removed from the runloop. If the task returns
+** an error code other than RUNLOOP_OK or RUNLOOP_OK_TASK_ABORT, and
+** if a taskErrorCallback was registered during initialization, that
+** callback will be executed after removing the task from the runloop. */
+typedef uint8_t (*RUNLOOP_TaskCallbackT) (void* optArgPtr);
 
 
 //*****************************************************************************
@@ -85,13 +99,17 @@ typedef int8_t (*RUNLOOP_CallbackT) (void* optArgPtr);
 //*****************************************************************************
 
 int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
-                     UART_HandleT uartHandle);
+                     TIMER_ClockPrescalerT timerClockPrescaler,
+                     UART_HandleT uartHandle,
+                     RUNLOOP_TaskErrorCallbackT taskErrorCallback,
+                     RUNLOOP_SyncErrorCallbackT syncErrorCallback);
 
-int8_t RUNLOOP_AddTask (RUNLOOP_CallbackT callbackPtr,
+int8_t RUNLOOP_AddTask (RUNLOOP_TaskCallbackT callbackPtr,
                         void* callbackArgPtr,
                         uint16_t numberOfExecutions,
                         uint32_t periodMs,
-                        uint32_t initialDelayMs);
+                        uint32_t initialDelayMs,
+                        uint8_t* taskIdPtr);
 
 void RUNLOOP_Run (void);
 
