@@ -141,6 +141,10 @@ static RUNLOOP_TaskErrorCallbackT runloopTaskErrorCallback = NULL;
 // Callback that will be executed when task executions are dropped:
 static RUNLOOP_SyncErrorCallbackT runloopSyncErrorCallback = NULL;
 
+#if RUNLOOP_WITH_UPTIME
+static uint64_t runloopUptimeCycles = 0;
+#endif
+
 
 //*****************************************************************************
 //********************** LOCAL FUNCTION DECLARATIONS **************************
@@ -276,7 +280,7 @@ static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                 if (result != RUNLOOP_OK)
                 {
 #if RUNLOOP_DEBUG
-                    printf("[RUNLOOP] Task %u: %u\n", ii, result);
+                    printf("[DEBUG] Task %u: %u\n", ii, result);
 #endif
                     // Task returned with RUNLOOP_OK_TASK_ABORT or with error code,
                     // invalidate task:
@@ -310,6 +314,15 @@ static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                         }
                         else
                         {
+#if RUNLOOP_DEBUG
+                            printf("[DEBUG]" "elapsedCycles: %lu\n", elapsedCycles);
+                            printf("[DEBUG]" "cyclesToNextExecution: %lu\n",\
+                                   task_ptr->cyclesToNextExecution);
+                            printf("[DEBUG]" "cyclesPerPeriod: %lu\n",\
+                                    task_ptr->cyclesPerPeriod);
+                            printf("[DEBUG]" "elapsed_cycles_overdue: %lu\n",\
+                                    elapsed_cycles_overdue);
+#endif
                             // Skip one or more executions of the task, but re-align
                             // the timing of the task to its previous pattern:
                             task_ptr->cyclesToNextExecution = task_ptr->cyclesPerPeriod - \
@@ -352,7 +365,7 @@ static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
                 if (result != RUNLOOP_OK)
                 {
 #if RUNLOOP_DEBUG
-                    printf("[RUNLOOP] Task %u: %u\n", ii, result);
+                    printf("[DEBUG] Task %u: %u\n", ii, result);
 #endif
                     // Task returned with RUNLOOP_OK_TASK_ABORT or with error code,
                     // invalidate task:
@@ -563,6 +576,10 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
         }
     }
 
+#if RUNLOOP_WITH_UPTIME
+    runloopUptimeCycles = 0;
+#endif
+
     runloopTaskErrorCallback = taskErrorCallback;
     runloopSyncErrorCallback = syncErrorCallback;
     runloopUartHandle = uartHandle;
@@ -611,7 +628,7 @@ int8_t RUNLOOP_AddTask (RUNLOOP_TaskCallbackT callbackPtr,
     runloopTaskT* task_ptr = NULL;
 
     if ((callbackPtr == NULL)
-    ||  (periodMs == 0))
+    ||  ((periodMs == 0) && (numberOfExecutions != 1)))
     {
         return (RUNLOOP_ERR_BAD_PARAMETER);
     }
@@ -673,6 +690,14 @@ void RUNLOOP_Run (void)
     uint8_t tasks_executed = 0;
     uint32_t stopwatch_cycles = 0;
 
+#if (RUNLOOP_WITH_UPTIME) && (RUNLOOP_UPTIME_UPDATE_INTERVAL_MS)
+    uint32_t sleep_cycles = 0;
+#endif
+
+#if RUNLOOP_WITH_UPTIME
+    runloopUptimeCycles = 0;
+#endif
+
     // Reset flags:
     runloopHandle.running = 1;
     runloopHandle.flagCmdl = 0;
@@ -681,7 +706,7 @@ void RUNLOOP_Run (void)
     // Stop and reset the timer:
     TIMER_Stop(runloopTimerHandle, TIMER_Stop_ImmediatelyAndReset);
 
-    // Reset and enable the timer's stopwatch:
+    // Enable and reset the timer's stopwatch:
     TIMER_EnableDisableStopwatch(runloopTimerHandle, TIMER_Stopwatch_Enable);
 
     // Start the timer:
@@ -703,6 +728,14 @@ void RUNLOOP_Run (void)
                 TIMER_GetStopwatchSystemClockCycles(runloopTimerHandle,
                                                     &stopwatch_cycles,
                                                     TIMER_Stopwatch_Reset);
+#if RUNLOOP_WITH_UPTIME
+#if RUNLOOP_INTERRUPT_SAFETY
+                ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+#endif
+                {
+                    runloopUptimeCycles += stopwatch_cycles;
+                }
+#endif
 
                 // Activate new tasks:
                 if (runloopHandle.flagTaskAdded)
@@ -725,7 +758,24 @@ void RUNLOOP_Run (void)
             runloopHandle.flagStopwatch = 0;
 
             // Make the timer's stopwatch notify the runloop when the next
-            // execution time is reached:
+            // execution time or uptime update is reached:
+#if (RUNLOOP_WITH_UPTIME) && (RUNLOOP_UPTIME_UPDATE_INTERVAL_MS)
+            if ( (runloopTaskHeadPtr)
+            &&   (runloopTaskHeadPtr->cyclesToNextExecution <
+                    (RUNLOOP_UPTIME_UPDATE_INTERVAL_MS) * ((F_CPU)/1000) ) )
+            {
+                sleep_cycles = runloopTaskHeadPtr->cyclesToNextExecution;
+            }
+            else
+            {
+                sleep_cycles = (RUNLOOP_UPTIME_UPDATE_INTERVAL_MS);
+            }
+            TIMER_SetStopwatchTimeCallback \
+                                (runloopTimerHandle,
+                                 runloopStopwatchCallback,
+                                 NULL,
+                                 sleep_cycles);
+#else
             if (runloopTaskHeadPtr)
             {
                 TIMER_SetStopwatchTimeCallback \
@@ -734,6 +784,7 @@ void RUNLOOP_Run (void)
                                      NULL,
                                      runloopTaskHeadPtr->cyclesToNextExecution);
             }
+#endif
 
             // Sleep while the runloop is idle:
             while ((runloopHandle.running)
@@ -808,6 +859,109 @@ void RUNLOOP_Stop (void* optArgPtr)
     runloopHandle.running = 0;
     return;
 }
+
+#if RUNLOOP_WITH_UPTIME
+/*!
+*******************************************************************************
+** \brief   Retrieve the number of elapsed system clock cycles since the
+**          runloop was started by RUNLOOP_Run().
+**
+** \note    This function can generally be called from both runloop tasks
+**          and interrupt context. However, the uptime is updated only
+**          before task execution by default, hence the uptime may be
+**          outdated if called from interrupt context. In order to overcome
+**          this issue, the macro RUNLOOP_UPTIME_UPDATE_INTERVAL_MS can be
+**          specified, which defines a minimum uptime update interval in
+**          milliseconds. Also note that RUNLOOP_INTERRUPT_SAFETY must be
+**          enabled in order to safely call this function from ISR context.
+**
+** \param   systemClockCyclesPtr
+**              Will receive the number of elapsed system clock cycles.
+**
+** \return
+**          - #RUNLOOP_OK on success.
+**          - #RUNLOOP_ERR_BAD_PARAMETER if systemClockCyclesPtr is NULL.
+**
+*******************************************************************************
+*/
+int8_t RUNLOOP_GetUptimeClockCycles (uint64_t* systemClockCyclesPtr)
+{
+    if (systemClockCyclesPtr == NULL)
+    {
+        return (RUNLOOP_ERR_BAD_PARAMETER);
+    }
+
+    *systemClockCyclesPtr = runloopUptimeCycles;
+
+    return (RUNLOOP_OK);
+}
+#endif
+
+#if RUNLOOP_WITH_UPTIME
+/*!
+*******************************************************************************
+** \brief   Retrieve the elapsed time since the runloop was started by
+**          RUNLOOP_Run() in a human-readable format. The total elapsed time
+**          is the sum of all time components returned by this function.
+**
+** \note    This function can generally be called from both runloop tasks
+**          and interrupt context. However, the uptime is updated only
+**          before task execution by default, hence the uptime may be
+**          outdated if called from interrupt context. In order to overcome
+**          this issue, the macro RUNLOOP_UPTIME_UPDATE_INTERVAL_MS can be
+**          specified, which defines a minimum uptime update interval in
+**          milliseconds. Also note that RUNLOOP_INTERRUPT_SAFETY must be
+**          enabled in order to safely call this function from ISR context.
+**
+** \param   daysPtr
+**              Will receive the number of elapsed days.
+** \param   hoursPtr
+**              Will receive the number of elapsed hours.
+** \param   minutesPtr
+**              Will receive the number of elapsed minutes.
+** \param   secondsPtr
+**              Will receive the number of elapsed seconds.
+** \param   millisecondsPtr
+**              Will receive the number of elapsed milliseconds.
+**
+** \return
+**          - #RUNLOOP_OK on success.
+**          - #RUNLOOP_ERR_BAD_PARAMETER if any of the given pointers is NULL.
+**
+*******************************************************************************
+*/
+int8_t RUNLOOP_GetUptimeHumanReadable (uint16_t* daysPtr,
+                                       uint8_t*  hoursPtr,
+                                       uint8_t*  minutesPtr,
+                                       uint8_t*  secondsPtr,
+                                       uint16_t* millisecondsPtr)
+{
+    uint64_t tmp = 0;
+
+    if ((daysPtr == NULL)
+    ||  (hoursPtr == NULL)
+    ||  (minutesPtr == NULL)
+    ||  (secondsPtr == NULL)
+    ||  (millisecondsPtr == NULL))
+    {
+        return (RUNLOOP_ERR_BAD_PARAMETER);
+    }
+
+    // Calculate human readable data:
+    tmp = runloopUptimeCycles / ((F_CPU) / 1000); // total time in ms
+    *millisecondsPtr = tmp % 1000;
+    tmp /= 1000;
+    *secondsPtr = tmp % 60;
+    tmp /= 60;
+    *minutesPtr = tmp % 60;
+    tmp /= 60;
+    *hoursPtr = tmp % 24;
+    tmp /= 24;
+    *daysPtr = (uint16_t) tmp;
+
+    return (RUNLOOP_OK);
+}
+#endif
 
 //*****************************************************************************
 //*********************** INTERRUPT SERVICE ROUTINES **************************

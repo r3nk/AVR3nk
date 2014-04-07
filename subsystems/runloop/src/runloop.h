@@ -27,7 +27,7 @@
 
 //! CPU clock frequency
 #ifndef F_CPU
-#define F_CPU                       18432000
+#define F_CPU                               18432000
 #endif
 
 //! Maximum number of tasks that can be scheduled at the same time. Should be < 256.
@@ -35,8 +35,26 @@
 #define RUNLOOP_MAX_NUMBER_OF_TASKS         10
 #endif
 
-/*! Set to 1 if RUNLOOP_AddTask() will be called from within ISRs.
-**  If set, TIMER_INTERRUPT_SAFETY must also be set to 1. */
+//! Set to 1 to enable the uptime feature of the runloop.
+#ifndef RUNLOOP_WITH_UPTIME
+#define RUNLOOP_WITH_UPTIME                 1
+#endif
+
+/*! If RUNLOOP_WITH_UPTIME is enabled, this defines the minimum
+**  uptime update interval in milliseconds. This setting is only
+**  needed if the uptime is read from interrupt service routines
+**  since the uptime is updated before task execution anyway.
+**  If set to 0, the uptime will be updated only before task
+**  execution in the runloop, which is the recommended setting in
+**  case that the uptime is only read by runloop tasks. The value
+**  should not be specified greater than
+**  ((2^32 - 1) / (F_CPU / 1000)) - 1. */
+#ifndef RUNLOOP_UPTIME_UPDATE_INTERVAL_MS
+#define RUNLOOP_UPTIME_UPDATE_INTERVAL_MS   0
+#endif
+
+/*! Set to 1 if RUNLOOP_AddTask(), RUNLOOP_GetUptimeClockCycles(),
+**  or RUNLOOP_GetUptimeHumanReadable() will be called from within ISRs. */
 #ifndef RUNLOOP_INTERRUPT_SAFETY
 #define RUNLOOP_INTERRUPT_SAFETY            0
 #endif
@@ -115,4 +133,15 @@ void RUNLOOP_Run (void);
 
 void RUNLOOP_Stop (void* optArgPtr);
 
-#endif
+#if RUNLOOP_WITH_UPTIME
+int8_t RUNLOOP_GetUptimeClockCycles (uint64_t* systemClockCyclesPtr);
+
+int8_t RUNLOOP_GetUptimeHumanReadable (uint16_t* daysPtr,
+                                       uint8_t*  hoursPtr,
+                                       uint8_t*  minutesPtr,
+                                       uint8_t*  secondsPtr,
+                                       uint16_t* millisecondsPtr);
+#endif // RUNLOOP_WITH_UPTIME
+
+#endif // RUNLOOP_H
+
