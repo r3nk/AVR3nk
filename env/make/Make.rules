@@ -4,7 +4,7 @@
 ##
 ## Copyright (C) 2009-2013 Robin Klose
 ##
-## This file is part of AVR3nk, available at 
+## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
 ##
 ################################################################
@@ -16,7 +16,7 @@
 .PHONY: default clean headers build install all program
 
 # FORCE is actually obsolete since .PHONY is available
-FORCE: 
+FORCE:
 
 ################################################################
 
@@ -35,7 +35,7 @@ headers: $(DIRECTORIES:%=subdir-headers-%)
 build: $(DIRECTORIES:%=subdir-build-%)
 install: $(DIRECTORIES:%=subdir-install-%)
 all: $(DIRECTORIES:%=subdir-all-%)
-program: 
+program:
 
 else ifdef LIBRARY
 
@@ -45,7 +45,7 @@ headers: $(MCU:%=mcu-install-headers-%)
 build: $(MCU:%=mcu-build-objects-%) $(MCU:%=mcu-build-library-%)
 install: headers $(MCU:%=mcu-install-library-%)
 all: clean headers build install
-program: 
+program:
 
 else ifdef APPLICATION
 
@@ -72,31 +72,31 @@ endif #OVERRIDE_DEFAULT_TARGETS
 
 .PHONY: subdir-clean-%
 subdir-clean-%:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Making clean in \[$(SUBDIR)/$(@:subdir-clean-%=%)\]
 	@$(SUBMAKE) -C $(@:subdir-clean-%=%) clean
 
 .PHONY: subdir-headers-%
 subdir-headers-%:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Making headers in \[$(SUBDIR)/$(@:subdir-headers-%=%)\]
 	@$(SUBMAKE) -C $(@:subdir-headers-%=%) headers
 
 .PHONY: subdir-build-%
 subdir-build-%:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Building \[$(SUBDIR)/$(@:subdir-build-%=%)\]
 	@$(SUBMAKE) -C $(@:subdir-build-%=%) build
 
 .PHONY: subdir-install-%
 subdir-install-%:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Making install in \[$(SUBDIR)/$(@:subdir-install-%=%)\]
 	@$(SUBMAKE) -C $(@:subdir-install-%=%) install
 
 .PHONY: subdir-all-%
 subdir-all-%:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Making all in \[$(SUBDIR)/$(@:subdir-all-%=%)\]
 	@$(SUBMAKE) -C $(@:subdir-all-%=%) all
 
@@ -157,7 +157,7 @@ build-dependencies: $(DEPBUILDS_ITERATIVE) $(DEPBUILDS_RECURSIVE)
 
 # build dependencies iteratively from list:
 .PHONY: $(DEPBUILDS_ITERATIVE)
-$(DEPBUILDS_ITERATIVE): 
+$(DEPBUILDS_ITERATIVE):
 	@$(SUBMAKE) -C $(TOPDIR)/$@ TARGET_MCU=$(TARGET_MCU) \
     BASE_SUBDIR=$(SUBDIR) build-ideps
 
@@ -168,7 +168,7 @@ build-ideps: install-headers build-objects build-library
 
 # build dependencies recursively:
 .PHONY: $(DEPBUILDS_RECURSIVE)
-$(DEPBUILDS_RECURSIVE): 
+$(DEPBUILDS_RECURSIVE):
 	@$(SUBMAKE) -C $(TOPDIR)/$@ TARGET_MCU=$(TARGET_MCU) \
     BASE_SUBDIR=$(SUBDIR) build-rdeps
 
@@ -190,21 +190,21 @@ $(DEPENDENCIES):
 # clean build objects for target MCU
 .PHONY: clean-objects
 clean-objects:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Deleting object files for MCU \[$(TARGET_MCU)\]
 	$(AT) $(RM_F) $(BUILD_OBJECTS)
 
 # clean built library for target MCU
 .PHONY: clean-library
 clean-library:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Deleting library for MCU \[$(TARGET_MCU)\]
 	$(AT) $(RM_F) $(BUILD_LIBRARY)
 
 # clean all program files for target MCU
 .PHONY: clean-program
 clean-program:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Deleting program files for MCU \[$(TARGET_MCU)\]
 	$(AT) $(RM_F) $(BUILD_PROGRAM_ELF) $(BUILD_PROGRAM_MAP) \
 	$(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM) $(BUILD_PROGRAM_LSS)
@@ -212,21 +212,21 @@ clean-program:
 # clean the whole build directory
 .PHONY: clean-builddir
 clean-builddir:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Deleting built files
 	$(AT) $(RM_RF) $(BUILD_TOP_DIR)
 
 # clean the complete install tree
 .PHONY: clean-install
 clean-install:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Deleting all installed files
 	$(AT) $(RM_RF) $(TOPDIR)/install/*
 
 # clean all files read from the MCU
 .PHONY: clean-read
 clean-read:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Deleting all read files for MCU \[$(TARGET_MCU)\]
 	$(AT) $(RM_RF) $(READ_PROGRAM_FILE) $(READ_EEPROM_FILE)
 
@@ -238,7 +238,7 @@ clean-read:
 .PHONY: build-objects
 ifeq ($(SOURCES), )
 build-objects:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) ERROR: You must specify the SOURCES variable in your makefile for target \[build-objects\]!
 else
 build-objects: $(BUILD_OBJECTS)
@@ -256,14 +256,14 @@ $(BUILD_DIR)/%.o: %.c $(wildcard *.h) $(wildcard */*.h) $(TOPDIR)/$(BASE_SUBDIR)
 .PHONY: build-library
 ifeq ($(LIBRARY), )
 build-library:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) ERROR: You must specify the LIBRARY variable in your makefile for target \[build-library\]!
 else
 build-library: $(BUILD_LIBRARY)
 endif
 
 $(BUILD_DIR)/%.a: $(BUILD_OBJECTS)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Building library for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Archiving \[$?\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(BUILD_DIR)
@@ -273,35 +273,35 @@ $(BUILD_DIR)/%.a: $(BUILD_OBJECTS)
 .PHONY: build-application
 ifeq ($(APPLICATION), )
 build-application:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) ERROR: You must specify the APPLICATION variable in your makefile for target \[build-application\]!
 else
 build-application: $(BUILD_PROGRAM_ELF) $(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM) $(BUILD_PROGRAM_LSS)
 endif
 
 $(BUILD_DIR)/%.elf: $(BUILD_OBJECTS) $(IDEPS_LIBRARIES) $(RDEPS_LIBRARIES)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Building ELF file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Linking \[$(BUILD_OBJECTS) $(LIBRARIES) $(IDEPS_LIBRARIES) $(RDEPS_LIBRARIES)\] --\> \[$(BUILD_PROGRAM_ELF)\]
 	$(AT)$(MKDIR_P) $(BUILD_DIR)
 	$(AT)$(CC) $(LDFLAGS) $(LDFLAGS_USER) $(BUILD_OBJECTS) $(LDDIRS) $(LDLIBS) -o $(BUILD_PROGRAM_ELF)
 
 $(BUILD_DIR)/%.hex: $(BUILD_PROGRAM_ELF)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Generating HEX file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Objcpy \[$<\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(BUILD_DIR)
 	$(AT)$(OBJCPY) $(OBJCPY_HEX_FLAGS) $< $@
 
 $(BUILD_DIR)/%.eep: $(BUILD_PROGRAM_ELF)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Generating EEPROM file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Objcpy \[$<\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(BUILD_DIR)
 	-$(AT)$(OBJCPY) $(OBJCPY_EEP_FLAGS) $< $@ || exit 0
 
 $(BUILD_DIR)/%.lss: $(BUILD_PROGRAM_ELF)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Generating LSS file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Objdump \[$<\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(BUILD_DIR)
@@ -314,28 +314,28 @@ $(BUILD_DIR)/%.lss: $(BUILD_PROGRAM_ELF)
 .PHONY: install-headers
 ifeq ($(HEADERS), )
 install-headers:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) ERROR: You must specify the HEADERS variable in your makefile for target \[install-headers\]!
 else
 install-headers: $(INSTALL_HEADERS)
 endif
 
 $(INSTALL_HEADERS_PKG_DIR)/%.h: %.h
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Installing header file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Copying \[$<\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(INSTALL_HEADERS_PKG_DIR)
 	$(AT)$(CP) $< $@
 
 $(INSTALL_HEADERS_PKG_DIR)/%.h: */%.h
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Installing header file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Copying \[$<\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(INSTALL_HEADERS_PKG_DIR)
 	$(AT)$(CP) $< $@
 
 $(INSTALL_HEADERS_PKG_DIR)/%.h: */*/%.h
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Installing header file for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Copying \[$<\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(INSTALL_HEADERS_PKG_DIR)
@@ -344,7 +344,7 @@ $(INSTALL_HEADERS_PKG_DIR)/%.h: */*/%.h
 .PHONY: install-library
 ifeq ($(LIBRARY), )
 install-library:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) ERROR: You must specify the LIBRARY variable in your makefile for target \[install-library\]!
 else
 install-library: build-objects $(INSTALL_LIBRARY)
@@ -353,14 +353,14 @@ endif
 .PHONY: install-library-prebuilt
 ifeq ($(LIBRARY), )
 install-library-prebuilt:
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) ERROR: You must specify the LIBRARY variable in your makefile for target \[install-library-prebuilt\]!
 else
 install-library-prebuilt: $(INSTALL_LIBRARY)
 endif
 
 $(INSTALL_LIBRARY_DIR)/%.a: $(BUILD_DIR)/%.a
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Installing library for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) Copying \[$<\] --\> \[$@\]
 	$(AT)$(MKDIR_P) $(INSTALL_LIBRARY_DIR)
@@ -383,13 +383,13 @@ $(RDEPS_LIBRARY): $(BUILD_LIBRARY)
 # Display memory usage on the command line
 .PHONY: size
 size: $(BUILD_PROGRAM_ELF) $(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Calculating size of \[$<\] for MCU \[$(TARGET_MCU)\]
-	@$(ECHO) 
+	@$(ECHO)
 	$(AT) $(SIZE) --mcu=$(TARGET_MCU) --format=avr $<
 	$(AT)$(ECHO) $(word 2, $^):
 	$(AT) $(SIZE) --target=ihex $(word 2, $^)
-	@$(ECHO) 
+	@$(ECHO)
 	$(AT)$(ECHO) $(word 3, $^):
 	$(AT) $(SIZE) --target=ihex $(word 3, $^)
 
@@ -397,7 +397,7 @@ size: $(BUILD_PROGRAM_ELF) $(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM)
 # Write program to flash memory
 .PHONY: write-program
 write-program: $(BUILD_PROGRAM_HEX)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Flashing program memory for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$<\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_USER_FLAGS) -U flash:w:$<:i
@@ -406,7 +406,7 @@ write-program: $(BUILD_PROGRAM_HEX)
 # Write EEPROM
 .PHONY: write-eeprom
 write-eeprom: $(BUILD_PROGRAM_EEPROM)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Writing EEPROM for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$<\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_USER_FLAGS) -U eeprom:w:$<:a
@@ -415,7 +415,7 @@ write-eeprom: $(BUILD_PROGRAM_EEPROM)
 # Write both flash and EEPROM
 .PHONY: write-all
 write-all: $(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Writing program memory and EEPROM for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$^\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_USER_FLAGS) -U flash:w:$<:i -U eeprom:w:$(word 2, $^):a
@@ -424,7 +424,7 @@ write-all: $(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM)
 # Verify program, i.e. read the program from flash and compare with locally stored programming file
 .PHONY: verify-program
 verify-program: $(BUILD_PROGRAM_HEX)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Verify program memory for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$<\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_USER_FLAGS) -U flash:v:$<:i
@@ -433,7 +433,7 @@ verify-program: $(BUILD_PROGRAM_HEX)
 # Verify EEPROM, i.e. read eeprom from flash and compare with locally stored EEPROM file
 .PHONY: verify-eeprom
 verify-eeprom: $(BUILD_PROGRAM_EEPROM)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Verifying EEPROM for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$<\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_USER_FLAGS) -U eeprom:v:$<:a
@@ -442,7 +442,7 @@ verify-eeprom: $(BUILD_PROGRAM_EEPROM)
 # Verify both flash and EEPROM
 .PHONY: verify-all
 verify-all: $(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Verifying program memory and EEPROM for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$^\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_USER_FLAGS) -U flash:v:$<:i -U eeprom:v:$(word 2, $^):a
@@ -453,7 +453,7 @@ verify-all: $(BUILD_PROGRAM_HEX) $(BUILD_PROGRAM_EEPROM)
 read-program: $(READ_PROGRAM_FILE)
 
 $(READ_DIR)/%.hex: FORCE
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Reading program memory for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$@\]
 	$(AT)$(MKDIR_P) $(READ_DIR)
@@ -465,7 +465,7 @@ $(READ_DIR)/%.hex: FORCE
 read-eeprom: $(READ_EEPROM_FILE)
 
 $(READ_DIR)/%.eep: FORCE
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Reading EEPROM for MCU \[$(TARGET_MCU)\]
 	@$(ECHO) $(PREFIX) --\> \[$@\]
 	$(AT)$(MKDIR_P) $(READ_DIR)
@@ -480,7 +480,7 @@ read-all: $(READ_PROGRAM_FILE) $(READ_EEPROM_FILE)
 # Erase the device, i.e. erase program memory, EEPROM and clear lock bits
 .PHONY: erase
 erase: $(BUILD_PROGRAM_HEX)
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Erasing program memory and EEPROM and clearing lock bits for MCU \[$(TARGET_MCU)\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_USER_FLAGS) -e
 
@@ -488,6 +488,6 @@ erase: $(BUILD_PROGRAM_HEX)
 # Initialize a erase-write cycle counter that is stored at the last 4 bytes of the device EEPROM
 .PHONY: avrdude-init-counter
 avrdude-init-counter: FORCE
-	@$(ECHO) 
+	@$(ECHO)
 	@$(ECHO) $(PREFIX) Initializing erase-write cycle counter with $(AVRDUDE_EW_CYCLE_COUNT) for MCU \[$(TARGET_MCU)\]
 	$(AT) $(AVRDUDE) $(AVRDUDE_FLAGS) -Y $(AVRDUDE_EW_CYCLE_COUNT)

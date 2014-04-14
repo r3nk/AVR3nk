@@ -28,16 +28,16 @@ Public functions always have the name of their package as prefix in capitalized
 letters followed by a subscore. The functionality is denoted in camel case:
 DRIVER_ThisPartShouldBeAShortDescriptionOfTheFunctionality
 
-For instance, the name of a function that sets up the baud rate of the UART 
+For instance, the name of a function that sets up the baud rate of the UART
 interface looks like this:
 int8_t UART_SetBaudRate(UART_BaudT baudRate);
 
 UART_BaudT is a defined data type that is publicly visible.
-For its naming guidelines, see "Type Definitions" below. 
+For its naming guidelines, see "Type Definitions" below.
 
 Private functions are declared with the keyword static. In order to make them
-distinguishable from public functions, they must have the package name as a 
-prefix in lower case letters, directly followed by the function description 
+distinguishable from public functions, they must have the package name as a
+prefix in lower case letters, directly followed by the function description
 in camel case:
 driverThisIsAShortDescriptionOfTheFunctionality
 
@@ -47,13 +47,13 @@ static cmdlCommandT* cmdlFindCommand(char* cmdNamePtr);
 
 Note that no subscore is inserted between cmdl and FindCommand here.
 Also note that cmdlCommandT is a defined data type that is visible only locally.
-For details, see the description on type definitions below. 
+For details, see the description on type definitions below.
 
 ==============================
 3) Variable Naming
 ==============================
 
-Global variables: Variables which should be publicly visible must be declared 
+Global variables: Variables which should be publicly visible must be declared
 in the corresponding public header file with the keyword 'extern'.
 Global variables are defined in only one C-file in the package.
 They are prefixed with the package name in capital letters followed by a
@@ -92,9 +92,9 @@ For instance, an array containing 11 16-bit values would be defined like this:
 uint16_t naming_demo_arr[11];
 
 
-Static local variables: Variables that are defined within functions and which 
-are declared as static are called static local variables. They keep their 
-values across function calls. Static local variables should be prefixed with 
+Static local variables: Variables that are defined within functions and which
+are declared as static are called static local variables. They keep their
+values across function calls. Static local variables should be prefixed with
 the package name, followed by a subscore. The rest of their naming convention
 is identical to automatic variables:
 driver_this_is_a_static_variable
@@ -118,7 +118,7 @@ uint8_t* temp_ptr;
 
 
 For arrays and strings, it is recommended to use an "arr" or "array"
-and a "str" or "string" suffix. However, as arrays and strings are handled 
+and a "str" or "string" suffix. However, as arrays and strings are handled
 similarly to pointers in many respects, they may also be suffixed by "ptr".
 
 
@@ -176,9 +176,9 @@ typedef enum
 ==============================
 
 Each file, procedure, data type, variable and macro should feature a description
-if this might support others reading the code. Documenting comments should apply 
+if this might support others reading the code. Documenting comments should apply
 doxygen syntax: see www.doxygen.org
-A doxygen comment is introduced like a normal comment, followed by an exclamation 
+A doxygen comment is introduced like a normal comment, followed by an exclamation
 mark (!).
 
 Here is an example of a procedure documentation:
@@ -190,7 +190,7 @@ Here is an example of a procedure documentation:
 **          You may write a more detailed description here.
 **
 ** \attention
-**          Point out something important if necessary. 
+**          Point out something important if necessary.
 **
 ** \param   paramName1  Describe the first parameter of the procedure.
 ** \param   paramName2  Describe the second parameter of the procedure.

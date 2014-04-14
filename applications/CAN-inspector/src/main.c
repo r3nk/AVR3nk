@@ -122,7 +122,7 @@ static int8_t appInit(void)
     memset(&cb_opts, 0, sizeof(cb_opts));
     cb_opts.execOnRxWait = 1;
     cb_opts.writeRxToBuffer = 1;
-    result = UART_RegisterRxCallback(appUartHandle, 'q', 
+    result = UART_RegisterRxCallback(appUartHandle, 'q',
                                      appListenAbortFunc, NULL, cb_opts);
     if(result != UART_OK)
     {

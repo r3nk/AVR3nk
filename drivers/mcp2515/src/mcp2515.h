@@ -275,7 +275,7 @@ typedef struct
 **
 **          The baudRatePrescaler (BRP) is a programmable prescaler which
 **          defines the Time Quantum period (TQ) with respect to the frequency
-**          of the connected oscillator (F_MCP2515). 
+**          of the connected oscillator (F_MCP2515).
 **          TQ = 2 * (BRP + 1) / F_MCP2515
 **
 **          See mcp2515_config.h for automatic configuration settings of the
@@ -314,7 +314,7 @@ typedef struct
 **
 **          The baudRatePrescaler (BRP) is a programmable prescaler which
 **          defines the Time Quantum period (TQ) with respect to the frequency
-**          of the connected oscillator (F_MCP2515). 
+**          of the connected oscillator (F_MCP2515).
 **          TQ = 2 * (BRP + 1) / F_MCP2515
 **
 **          See mcp2515_config.h for automatic configuration settings of the

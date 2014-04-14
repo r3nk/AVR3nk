@@ -1,14 +1,14 @@
 ################################################################
 ##
 ## AVRDUDE configuration.
-## Maps avr-gcc specific MCU names to avrdude specific names. 
+## Maps avr-gcc specific MCU names to avrdude specific names.
 ##
 ## Query MCU names known to avr-gcc: avr-gcc --target-help
 ## Query MCU names known to avrdude: avrdude -p?
 ##
 ## Copyright (C) 2009-2013 Robin Klose
 ##
-## This file is part of AVR3nk, available at 
+## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
 ##
 ################################################################

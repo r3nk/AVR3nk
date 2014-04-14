@@ -88,15 +88,15 @@
 //******** ATmega16 setup ********
 
 #ifdef atmega16
-    
-    /* NOTE: The registers of atmega16 are not bit-compatible to the 
+
+    /* NOTE: The registers of atmega16 are not bit-compatible to the
     **       corresponding registers of atmega644 and atmega644p.
     **       In order to write to GICR on atmega16, the macros
     **       MCP2515_INTNO_MAIN, MCP2515_INTNO_RXB0, and MCP2515_INTNO_RXB1
     **       should be set to 6, 7, and 5, respectively.
-    **       However, MCUCR allows to configure interrupt sense control 
-    **       only for INT0 and INT1 (the same bits as for atmega644p), 
-    **       but not for INT2. 
+    **       However, MCUCR allows to configure interrupt sense control
+    **       only for INT0 and INT1 (the same bits as for atmega644p),
+    **       but not for INT2.
     */
     #define EIMSK   GICR
     #define EICRA   MCUCR
