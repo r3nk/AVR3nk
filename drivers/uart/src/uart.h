@@ -153,6 +153,12 @@ typedef struct
     uint8_t           rxLedIdx : 3;
 } UART_LedParamsT;
 
+/*! Signature of a RX trigger callback. */
+typedef void (*UART_RxTriggerCallbackT) (void* optArgPtr, uint8_t rxByte);
+
+/*! Signature of a RX callback. */
+typedef void (*UART_RxCallbackT) (void* optArgPtr);
+
 /*! UART specific callback options. */
 typedef struct
 {
@@ -179,14 +185,13 @@ UART_HandleT UART_Init (UART_InterfaceIdT id,
                         UART_LedParamsT*  ledParamsPtr);
 int8_t  UART_IsInitialized(UART_HandleT handle);
 int8_t  UART_RegisterRxTriggerCallback(UART_HandleT handle,
-                                       void (*funcPtr)(void* optArgPtr, 
-                                                       uint8_t rxByte), 
+                                       UART_RxTriggerCallbackT funcPtr,
                                        void* optArgPtr,
                                        UART_RxCallbackOptionsT options);
 int8_t  UART_UnregisterRxTriggerCallback(UART_HandleT handle);
 int8_t  UART_RegisterRxCallback(UART_HandleT handle, 
                                 uint8_t rxByte,
-                                void (*funcPtr)(void* optArgPtr), 
+                                UART_RxCallbackT funcPtr,
                                 void* optArgPtr,
                                 UART_RxCallbackOptionsT options);
 int8_t  UART_UnregisterRxCallback(UART_HandleT handle, uint8_t rxByte);
