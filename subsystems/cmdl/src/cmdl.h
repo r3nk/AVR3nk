@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -86,22 +86,19 @@ typedef struct
     /*! Decides whether to flush the UART rx buffer after program execution.
     **  This is useful if you want characters that you typed on the keyboard
     **  while a program was still in execution to be discarded. Might be
-    **  helpful for hasty hackers who can't wait typing the next command.
+    **  helpful for hasty hackers who can't wait to type the next command.
     */
     uint8_t flushRxAfterExec : 1;
-
-    /*! Set this option to 1 if you want to wait until all characters left in
-    **  the tx buffer are transmitted before exiting (recommended). If you
-    **  select 0, transmission may be aborted.
-    */
-    uint8_t flushTxOnExit : 1;
 } CMDL_OptionsT;
+
 
 //*****************************************************************************
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-int8_t CMDL_Init (UART_HandleT uartHandle, CMDL_OptionsT options);
+int8_t CMDL_Init (UART_HandleT uartHandle,
+                  UART_RxCallbackT cmdlExecTriggerPtr,
+                  CMDL_OptionsT options);
 int8_t CMDL_IsInitialized (void);
 #if CMDL_USAGE_STRING_SUPPORT
 int8_t CMDL_RegisterCommand (void (*funcPtr) (uint8_t argc, char* argv[]),
@@ -111,7 +108,8 @@ int8_t CMDL_RegisterCommand (void (*funcPtr) (uint8_t argc, char* argv[]),
 int8_t CMDL_RegisterCommand (void (*funcPtr) (uint8_t argc, char* argv[]),
                              char* namePtr);
 #endif // CMDL_USAGE_STRING_SUPPORT
-void   CMDL_Run (void);
+void CMDL_PrintPrompt (char* prefixStr);
+void CMDL_Execute (void);
 
 
 #endif // CMDL_H
