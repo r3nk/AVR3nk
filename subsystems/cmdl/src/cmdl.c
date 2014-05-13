@@ -76,7 +76,7 @@ volatile static struct
 static UART_HandleT cmdlUartHandle;
 
 /*! The prompt string with a leading newline. */
-static char* cmdlPromptStr = "\n" CMDL_PROMPT;
+static char* cmdlPromptStr = CMDL_PROMPT;
 
 /*! String that contains the command string. */
 static char cmdlCmdString[CMDL_MAX_COMMAND_LENGTH + 1];
@@ -373,13 +373,23 @@ int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
 **          should be called once after application startup and after every
 **          execution of CMDL_Execute().
 **
+** \param   prefixStr   Optional prefix string.
+**
 *******************************************************************************
 */
-void CMDL_PrintPrompt(void)
+void CMDL_PrintPrompt(char* prefixStr)
 {
     // Print the prompt:
     //UART_TxField((uint8_t*)cmdlPromptStr, strlen(cmdlPromptStr));
-    printf(cmdlPromptStr);
+    if (prefixStr)
+    {
+        printf("\n[%s] %s", prefixStr, cmdlPromptStr);
+    }
+    else
+    {
+        printf("\n%s", cmdlPromptStr);
+    }
+    return;
 }
 
 /*!

@@ -108,7 +108,7 @@ int8_t CMDL_RegisterCommand (void (*funcPtr) (uint8_t argc, char* argv[]),
 int8_t CMDL_RegisterCommand (void (*funcPtr) (uint8_t argc, char* argv[]),
                              char* namePtr);
 #endif // CMDL_USAGE_STRING_SUPPORT
-void CMDL_PrintPrompt (void);
+void CMDL_PrintPrompt (char* prefixStr);
 void CMDL_Execute (void);
 
 

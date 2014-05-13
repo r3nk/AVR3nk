@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
     appFlags.exec = 0;
 
     // Print the prompt:
-    CMDL_PrintPrompt();
+    CMDL_PrintPrompt(NULL);
 
     // Wait for commands:
     while(appFlags.running)
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
         if(appFlags.exec) // start execution
         {
             CMDL_Execute();
-            CMDL_PrintPrompt();
+            CMDL_PrintPrompt(NULL);
             appFlags.exec = 0;
         }
     }
