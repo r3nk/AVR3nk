@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <avr/interrupt.h>
+#include <avr/wdt.h>
+#include <util/delay.h>
 #include <drivers/macros_pin.h>
 #include <drivers/uart.h>
 #include <drivers/timer.h>
@@ -47,19 +49,27 @@ static void    appTaskErrorCallback (uint8_t taskId, uint8_t errorCode);
 static void    appSyncErrorCallback (uint8_t taskId, uint16_t dropCount);
 static uint8_t appToggleLedTask (void* optArgPtr);
 static uint8_t appPrintUptimeTask (void* optArgPtr);
+static uint8_t appActiveWaitingTask (void* optArgPtr);
+#if RUNLOOP_WITH_CMDL
+static void    appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[]);
+static void    appAddPrintUptimeTaskViaCmdl (uint8_t argc, char* argv[]);
+static void    appAddActiveWaitingTaskViaCmdl (uint8_t argc, char* argv[]);
+#else
 static void    appAddToggleLedTaskViaKey (void* optArgPtr);
 static void    appAddPrintUptimeTaskViaKey (void* optArgPtr);
-static void    appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[]);
-static void    appPrintUptimeViaCmdl (uint8_t argc, char* argv[]);
+static void    appAddActiveWaitingTaskViaKey (void* optArgPtr);
+#endif
+
 
 //*****************************************************************************
 //**************************** LOCAL VARIABLES ********************************
 //*****************************************************************************
 
+static uint8_t appMCUSR __attribute__((section(".noinit")));
 static UART_HandleT appUartHandle = NULL;
 static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
 static uint8_t appPinIsHigh = 0;
-
+static uint32_t appActiveWaitingTaskDelayMs = 0;
 
 //*****************************************************************************
 //**************************** LOCAL FUNCTIONS ********************************
@@ -80,10 +90,11 @@ static uint8_t appPinIsHigh = 0;
 */
 static int8_t appInit (void)
 {
-    UART_LedParamsT led_params;
-    UART_RxCallbackOptionsT cb_opts;
-    CMDL_OptionsT cmdl_options;
     int8_t result;
+    UART_LedParamsT led_params;
+#if (RUNLOOP_WITH_CMDL == 0)
+    UART_RxCallbackOptionsT uart_cb_opts;
+#endif
 
     // Initialize UART and STDIO:
     memset(&led_params, 0, sizeof(led_params));
@@ -113,59 +124,6 @@ static int8_t appInit (void)
     // Enable interrupts:
     sei();
 
-    // Register UART callback that adds a task to the runloop:
-    memset(&cb_opts, 0, sizeof(cb_opts));
-    cb_opts.execOnRxWait = 0;
-    cb_opts.writeRxToBuffer = 0;
-    result = UART_RegisterRxCallback(appUartHandle,
-                                     (uint8_t)'f',
-                                     appAddToggleLedTaskViaKey,
-                                     NULL,
-                                     cb_opts);
-    if (result != UART_OK)
-    {
-        printf("UART_RegisterRxCallback: %d\n", result);
-        return(result);
-    }
-    result = UART_RegisterRxCallback(appUartHandle,
-                                     (uint8_t)'u',
-                                     appAddPrintUptimeTaskViaKey,
-                                     NULL,
-                                     cb_opts);
-    if (result != UART_OK)
-    {
-        printf("UART_RegisterRxCallback: %d\n", result);
-        return(result);
-    }
-
-    // Initialize CMDL:
-    memset(&cmdl_options, 0, sizeof(cmdl_options));
-    cmdl_options.flushRxAfterExec = 1;
-    cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(appUartHandle, cmdl_options);
-    if(result != CMDL_OK)
-    {
-        printf("CMDL_Init: %d\n", result);
-        return result;
-    }
-
-    // Register commands:
-    result = CMDL_RegisterCommand(appAddToggleLedTaskViaCmdl,
-                                  "addtask");
-    if (result != CMDL_OK)
-    {
-        printf ("CMDL_RegisterCommand: %d\n", result);
-        return result;
-    }
-    result = CMDL_RegisterCommand(appPrintUptimeViaCmdl,
-                                  "uptime");
-    if (result != CMDL_OK)
-    {
-        printf ("CMDL_RegisterCommand: %d\n", result);
-        return result;
-    }
-
-
     // Initialize RUNLOOP:
     result = RUNLOOP_Init(TIMER_TimerId_1,
                           TIMER_ClockPrescaler_1024,
@@ -177,6 +135,66 @@ static int8_t appInit (void)
         printf("RUNLOOP_Init: %d\n", result);
         return result;
     }
+
+#if RUNLOOP_WITH_CMDL
+    // Register CMDL commands:
+    result = CMDL_RegisterCommand(appAddToggleLedTaskViaCmdl,
+                                  "toggle");
+    if (result != CMDL_OK)
+    {
+        printf ("CMDL_RegisterCommand: %d\n", result);
+        return result;
+    }
+    result = CMDL_RegisterCommand(appAddPrintUptimeTaskViaCmdl,
+                                  "uptime");
+    if (result != CMDL_OK)
+    {
+        printf ("CMDL_RegisterCommand: %d\n", result);
+        return result;
+    }
+    result = CMDL_RegisterCommand(appAddActiveWaitingTaskViaCmdl,
+                                  "wait");
+    if (result != CMDL_OK)
+    {
+        printf ("CMDL_RegisterCommand: %d\n", result);
+        return result;
+    }
+#else
+    // Register UART callback that adds a task to the runloop:
+    memset(&uart_cb_opts, 0, sizeof(uart_cb_opts));
+    uart_cb_opts.execOnRxWait = 0;
+    uart_cb_opts.writeRxToBuffer = 1;
+    result = UART_RegisterRxCallback(appUartHandle,
+                                     (uint8_t)'f',
+                                     appAddToggleLedTaskViaKey,
+                                     NULL,
+                                     uart_cb_opts);
+    if (result != UART_OK)
+    {
+        printf("UART_RegisterRxCallback: %d\n", result);
+        return(result);
+    }
+    result = UART_RegisterRxCallback(appUartHandle,
+                                     (uint8_t)'u',
+                                     appAddPrintUptimeTaskViaKey,
+                                     NULL,
+                                     uart_cb_opts);
+    if (result != UART_OK)
+    {
+        printf("UART_RegisterRxCallback: %d\n", result);
+        return(result);
+    }
+    result = UART_RegisterRxCallback(appUartHandle,
+                                     (uint8_t)'w',
+                                     appAddActiveWaitingTaskViaKey,
+                                     NULL,
+                                     uart_cb_opts);
+    if (result != UART_OK)
+    {
+        printf("UART_RegisterRxCallback: %d\n", result);
+        return(result);
+    }
+#endif
 
     // Set the application's LED as output:
     appPinIsHigh = 0;
@@ -304,11 +322,160 @@ static uint8_t appPrintUptimeTask (void* optArgPtr)
     }
     else
     {
-        printf ("\rUptime: %02u:%02u:%02u.%03u\n", \
+        printf ("Uptime: %02u:%02u:%02u.%03u\n", \
                 hours, minutes, seconds, milliseconds);
     }
     return (RUNLOOP_OK);
 }
+
+/*!
+*******************************************************************************
+** \brief   Wait actively for a specified amount of time.
+**
+** \param   optArgPtr   Should point to a uint32_t containing the number of
+**                      milliseconds to wait.
+**
+*******************************************************************************
+*/
+static uint8_t appActiveWaitingTask (void* optArgPtr)
+{
+    uint32_t ii = 0;
+    for (ii = 0; ii < *(uint32_t*)optArgPtr; ii++)
+    {
+        _delay_ms(1UL);
+    }
+    return (RUNLOOP_OK);
+}
+
+#if RUNLOOP_WITH_CMDL
+/*!
+*******************************************************************************
+** \brief   Callback for the CMDL which adds the LED toggle task to the RUNLOOP.
+**
+** \param   argc    The argument count is should be 4.
+** \param   argv    The argument vector is expected to contain the command name,
+**                  the number of executions of the task, the task's period
+**                  in ms and the initial delay of the task in ms.
+**
+*******************************************************************************
+*/
+static void appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[])
+{
+    int8_t result = 0;
+    uint8_t task_id = 0;
+
+    if (argc != 4)
+    {
+        printf ("Usage: %s <numOfExec> <periodMs> <initialDelayMs>\n", argv[0]);
+        return;
+    }
+    result = RUNLOOP_AddTask(appToggleLedTask,
+                             NULL,
+                             (uint16_t)strtoul(argv[1], NULL, 0),
+                             strtoul(argv[2], NULL, 0),
+                             strtoul(argv[3], NULL, 0),
+                             &task_id);
+    if (result != (RUNLOOP_OK))
+    {
+        printf("Error in RUNLOOP_AddTask(): %d\n", result);
+    }
+    else
+    {
+        printf("Task added. Task ID: %u\n", task_id);
+    }
+    return;
+}
+
+/*!
+*******************************************************************************
+** \brief   Callback for the CMDL which adds the uptime printing task to
+**          the RUNLOOP.
+**
+** \param   argc    The argument count is should be 1 or 4.
+** \param   argv    The argument vector is expected to contain either
+**                  - only the command name, or
+**                  - the command name, the number of executions of the task,
+**                    the task's period in ms and the initial delay of the task
+**                    in ms.
+**
+*******************************************************************************
+*/
+static void appAddPrintUptimeTaskViaCmdl (uint8_t argc, char* argv[])
+{
+    int8_t result = 0;
+    uint8_t task_id = 0;
+
+    if (argc == 1)
+    {
+        appPrintUptimeTask(NULL);
+    }
+    else if (argc == 4)
+    {
+        result = RUNLOOP_AddTask(appPrintUptimeTask,
+                                 NULL,
+                                 (uint16_t)strtoul(argv[1], NULL, 0),
+                                 strtoul(argv[2], NULL, 0),
+                                 strtoul(argv[3], NULL, 0),
+                                 &task_id);
+        if (result != (RUNLOOP_OK))
+        {
+            printf("Error in RUNLOOP_AddTask(): %d\n", result);
+        }
+        else
+        {
+            printf("Task added. Task ID: %u\n", task_id);
+        }
+    }
+    else
+    {
+        printf ("Usage: %s <numOfExec> <periodMs> <initialDelayMs>\n", argv[0]);
+        return;
+    }
+    return;
+}
+
+/*!
+*******************************************************************************
+** \brief   Callback for the CMDL which adds the active waiting task to the
+**          RUNLOOP.
+**
+** \param   argc    The argument count is should be 5.
+** \param   argv    The argument vector is expected to contain the command name,
+**                  the number of milliseconds for active waiting, the number
+**                  of executions of the task, the task's period in ms and
+**                  the initial delay of the task in ms.
+**
+*******************************************************************************
+*/
+static void appAddActiveWaitingTaskViaCmdl (uint8_t argc, char* argv[])
+{
+    int8_t result = 0;
+    uint8_t task_id = 0;
+
+    if (argc != 5)
+    {
+        printf ("Usage: %s <activeWaitingDelayMs> <numOfExec> <periodMs> <initialDelayMs>\n", argv[0]);
+        return;
+    }
+    appActiveWaitingTaskDelayMs = strtoul(argv[1], NULL, 0);
+    result = RUNLOOP_AddTask(appActiveWaitingTask,
+                             (void*)&appActiveWaitingTaskDelayMs,
+                             (uint16_t)strtoul(argv[2], NULL, 0),
+                             strtoul(argv[3], NULL, 0),
+                             strtoul(argv[4], NULL, 0),
+                             &task_id);
+    if (result != (RUNLOOP_OK))
+    {
+        printf("Error in RUNLOOP_AddTask(): %d\n", result);
+    }
+    else
+    {
+        printf("Task added. Task ID: %u\n", task_id);
+    }
+    return;
+}
+
+#else // RUNLOOP_WITH_CMDL
 
 /*!
 *******************************************************************************
@@ -324,7 +491,7 @@ static void appAddToggleLedTaskViaKey (void* optArgPtr)
     uint8_t task_id = 0;
     result = RUNLOOP_AddTask(appToggleLedTask,
                              NULL,   // optional argument
-                             10,     // number of executions
+                             16,     // number of executions
                              500,    // period in ms
                              0,      // initial delay in ms
                              &task_id);  // task id pointer
@@ -371,31 +538,24 @@ static void appAddPrintUptimeTaskViaKey (void* optArgPtr)
 
 /*!
 *******************************************************************************
-** \brief   Callback for the CMDL which adds the toggle task to the RUNLOOP.
+** \brief   Callback for the UART which adds the active waiting task to the
+**          RUNLOOP.
 **
-** \param   argc    The argument count is should be 4.
-** \param   argv    The argument vector is expected to contain the command name,
-**                  the number of executions of the task, the task's period
-**                  in ms and the initial delay of the task in ms.
+** \param   optArgPtr   Not used.
 **
 *******************************************************************************
 */
-static void appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[])
+static void appAddActiveWaitingTaskViaKey (void* optArgPtr)
 {
     int8_t result = 0;
     uint8_t task_id = 0;
-
-    if (argc != 4)
-    {
-        printf ("Usage: %s <numOfExec> <periodMs> <initialDelayMs>\n", argv[0]);
-        return;
-    }
-    result = RUNLOOP_AddTask(appToggleLedTask,
-                             NULL,
-                             (uint16_t)strtoul(argv[1], NULL, 0),
-                             strtoul(argv[2], NULL, 0),
-                             strtoul(argv[3], NULL, 0),
-                             &task_id);
+    appActiveWaitingTaskDelayMs = 1000; // active waiting time in ms
+    result = RUNLOOP_AddTask(appActiveWaitingTask,
+                             &appActiveWaitingTaskDelayMs,
+                             1,          // number of executions
+                             0,          // period in ms
+                             0,          // initial delay in ms
+                             &task_id);  // task id pointer
     if (result != (RUNLOOP_OK))
     {
         printf("Error in RUNLOOP_AddTask(): %d\n", result);
@@ -406,27 +566,24 @@ static void appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[])
     }
     return;
 }
-
-/*!
-*******************************************************************************
-** \brief   Callback for the CMDL which adds the uptime printing task to
-**          the RUNLOOP.
-**
-** \param   argc    The argument count should be 2.
-** \param   argv    The argument vector is expected to contain the command name
-**                  and the update interval in milliseconds.
-*******************************************************************************
-*/
-static void appPrintUptimeViaCmdl (uint8_t argc, char* argv[])
-{
-    appPrintUptimeTask(NULL);
-    return;
-}
+#endif // RUNLOOP_WITH_CMDL
 
 
 //*****************************************************************************
 //*************************** PUBLIC FUNCTIONS ********************************
 //*****************************************************************************
+
+// HARDWARE RESET:
+void reset(void) __attribute__((naked)) __attribute__((section(".init3")));
+
+/*! Clear SREG_I on hardware reset, get reset source, disable the watchdog. */
+void reset(void)
+{
+    cli();
+    appMCUSR = MCUSR;
+    MCUSR = 0x00;
+    wdt_disable();
+}
 
 /*!
 *******************************************************************************
@@ -447,12 +604,17 @@ static void appPrintUptimeViaCmdl (uint8_t argc, char* argv[])
 int main(int argc, char* argv[])
 {
     if(appInit()) return(-1);
-    printf("Entering runloop...");
-    CMDL_Run();
-    UART_TxFlush(appUartHandle);
+    printf("\n\nInitialized. Reset source: JTRF:%d WDRF:%d BORF:%d EXTRF:%d PORF:%d\n",
+                                    appMCUSR & (1 << JTRF ) ? 1 : 0,
+                                    appMCUSR & (1 << WDRF ) ? 1 : 0,
+                                    appMCUSR & (1 << BORF ) ? 1 : 0,
+                                    appMCUSR & (1 << EXTRF) ? 1 : 0,
+                                    appMCUSR & (1 << PORF ) ? 1 : 0);
     RUNLOOP_Run();
+    UART_TxFlush(appUartHandle);
     return(0);
 }
+
 
 //*****************************************************************************
 //*********************** INTERRUPT SERVICE ROUTINES **************************
