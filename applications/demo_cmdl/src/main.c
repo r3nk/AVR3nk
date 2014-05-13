@@ -5,7 +5,7 @@
 **
 ** \author    Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -33,6 +33,8 @@
 static int8_t appInit(void);
 static int    appStdioPut(char chr, FILE* streamPtr);
 static int    appStdioGet(FILE* streamPtr);
+static void   appCmdlExec(void* optArgPtr);
+static void   appCmdlStop(uint8_t argc, char* argv[]);
 static void   appList(uint8_t argc, char* argv[]);
 static void   appMultiply(uint8_t argc, char* argv[]);
 static void   appPrintFloat(uint8_t argc, char* argv[]);
@@ -43,6 +45,12 @@ static void   appPrintFloat(uint8_t argc, char* argv[]);
 
 static UART_HandleT appUartHandle = NULL;
 static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
+
+static struct
+{
+    volatile uint8_t running : 1;
+    volatile uint8_t exec : 1;
+} appFlags;
 
 //*****************************************************************************
 //*************************** PUBLIC FUNCTIONS ********************************
@@ -65,7 +73,25 @@ int main(int argc, char* argv[])
     printf(" Demo Application: Command Line Interface\n");
     printf(" Author: Robin Klose\n");
     printf("**********************************************\n");
-    CMDL_Run();
+
+
+    // Init local state:
+    appFlags.running = 1;
+    appFlags.exec = 0;
+
+    // Print the prompt:
+    CMDL_PrintPrompt();
+
+    // Wait for commands:
+    while(appFlags.running)
+    {
+        if(appFlags.exec) // start execution
+        {
+            CMDL_Execute();
+            CMDL_PrintPrompt();
+            appFlags.exec = 0;
+        }
+    }
     printf("\n\nExiting...\n");
     UART_TxFlush(appUartHandle);
     return(0);
@@ -81,7 +107,7 @@ static int8_t appInit(void)
     CMDL_OptionsT cmdl_options;
     int8_t result;
 
-    // initialize UART and STDIO:
+    // Initialize UART and STDIO:
     memset(&led_params, 0, sizeof(led_params));
     led_params.txLedPortPtr = &PORTA;
     led_params.txLedDdrPtr  = &DDRA;
@@ -102,28 +128,33 @@ static int8_t appInit(void)
         return(-1);
     }
 
-    // assign stdio:
+    // Assign stdio:
     stdout = &appStdio;
     stdin  = &appStdio;
     sei();
 
-    // initialze CMDL:
+    // Initialize CMDL:
     cmdl_options.flushRxAfterExec = 1;
-    cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(appUartHandle, cmdl_options);
+    result = CMDL_Init(appUartHandle, &appCmdlExec, cmdl_options);
     if(result != CMDL_OK)
     {
-        printf("CMDL could not be initialized: %d\n", result);
+        printf("CMDL_Init: %d\n", result);
         return(-1);
     }
 
-    // register commands:
+    // Register commands:
+    CMDL_RegisterCommand(&appCmdlStop,
+                         "exit");
     CMDL_RegisterCommand(&appList,
                          "list");
     CMDL_RegisterCommand(&appMultiply,
                          "multiply");
     CMDL_RegisterCommand(&appPrintFloat,
                          "float");
+
+    // Initialize application flags:
+    memset(&appFlags, 0, sizeof(appFlags));
+
     return(0);
 }
 
@@ -138,14 +169,26 @@ static int appStdioGet(FILE* streamPtr)
     return((int)UART_RxByte(appUartHandle));
 }
 
+static void appCmdlExec(void* optArgPtr)
+{
+    appFlags.exec = 1;
+    return;
+}
+
+static void appCmdlStop(uint8_t argc, char* argv[])
+{
+    appFlags.running = 0;
+    return;
+}
+
 static void appList(uint8_t argc, char* argv[])
 {
     uint8_t ii;
 
-    printf("[test] argc = %d\n", argc);
+    printf("argc = %d\n", argc);
     for (ii = 0; ii < argc; ii++)
     {
-        printf("[test] argv[%d] = %s\n", ii, argv[ii]);
+        printf("argv[%d] = %s\n", ii, argv[ii]);
     }
     return;
 }
