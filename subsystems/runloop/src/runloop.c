@@ -1,8 +1,8 @@
 /*!
 *******************************************************************************
 *******************************************************************************
-** \brief   The RUNLOOP subsystem allows to create tasks and to schedule their
-**          execution in a periodic manner.
+** \brief   The RUNLOOP subsystem allows to schedule task executions
+**          in a periodic manner.
 **
 **          The runloop subsystem provides facilities to execute tasks in a
 **          periodic and time-delayed manner. To initialize the runloop,
@@ -21,13 +21,18 @@
 **          tasks are added only by already running tasks in the runloop,
 **          this macro can safely be disabled, which may improve the
 **          responsiveness of interrupts a little bit.
-**          The runloop execution can be temporarily superseded by an
-**          interactive command line interface by sending a 'q' to the UART.
-**          The runloop is halted and a prompt is shown. See the CMDL
-**          subsystem for detailed information on how to register commands
-**          with the commandline. When typing 'exit', runloop execution
-**          will continue.
-**          The runloop execution can also be interrupted by RUNLOOP_Stop().
+**          When the macro RUNLOOP_WITH_UPTIME is set, the runloop measures
+**          the elapsed time since it was started.
+**          The runloop can be augmented by the CMDL subsystem which allows
+**          to invoke commands interactively while other tasks are running
+**          in the background. In order to integrate the CMDL subsystem into
+**          the runloop, the RUNLOOP_WITH_CMDL macro must be set.
+**          The runloop execution can be temporarily paused by either
+**          a "pause" command (if RUNLOOP_WITH_CMDL is set) or by pressing
+**          the 'q' key (if not compiled with CMDL support). When paused, the
+**          runloop does not execute tasks and does not count the time.
+**          Execution can be resumed by the same command that paused the runloop.
+**          The runloop execution can be stopped by RUNLOOP_Stop().
 **          This command halts the runloop and effectively causes RUNLOOP_Run()
 **          to return.
 **          The maximum number of tasks that can be concurrently scheduled
@@ -129,7 +134,10 @@ static struct RUNLOOP_State
 {
     uint8_t initialized : 1;
     volatile uint8_t running : 1;
+#if RUNLOOP_WITH_CMDL
     volatile uint8_t flagCmdl : 1;
+#endif
+    volatile uint8_t flagPause : 1;
     volatile uint8_t flagStopwatch : 1;
     volatile uint8_t flagTaskAdded : 1;
     TIMER_TimerIdT timerId : 2;
@@ -145,12 +153,20 @@ static RUNLOOP_SyncErrorCallbackT runloopSyncErrorCallback = NULL;
 static uint64_t runloopUptimeCycles = 0;
 #endif
 
+static char* runloopRunningStr = "RUNNING";
+static char* runloopPausedStr = "PAUSED";
+
 
 //*****************************************************************************
 //********************** LOCAL FUNCTION DECLARATIONS **************************
 //*****************************************************************************
 
-static void runloopEnterCmdl (void* optArgPtr);
+#if RUNLOOP_WITH_CMDL
+static void runloopCmdlExecTrigger(void* optArgPtr);
+static void runloopPause (uint8_t argc, char* argv[]);
+#else
+static void runloopPause (void* optArgPtr);
+#endif
 static void runloopStopwatchCallback (void* optArgPtr);
 static void runloopActivateNewTasks (uint32_t elapsedCycles);
 static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles);
@@ -163,24 +179,50 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 //**************************** LOCAL FUNCTIONS ********************************
 //*****************************************************************************
 
+#if RUNLOOP_WITH_CMDL
+static void runloopCmdlExecTrigger(void* optArgPtr)
+{
+#if RUNLOOP_DEBUG
+    printf("Executing CMDL.\n");
+#endif
+    runloopHandle.flagCmdl = 1;
+    return;
+}
+
 /*!
 *******************************************************************************
-** \brief   Callback that makes the RUNLOOP enter an interactive
-**          commandline mode.
+** \brief   Callback that makes the RUNLOOP toggle a paused state.
+**
+** \param   argc    Not used by this function. Satisfies the callback
+**                  interface.
+** \param   argv    Not used by this function. Satisfies the callback
+**                  interface.
+**
+*******************************************************************************
+*/
+static void runloopPause (uint8_t argc, char* argv[])
+{
+    runloopHandle.flagPause = runloopHandle.flagPause ? 0 : 1;
+    return;
+}
+
+#else // RUNLOOP_WITH_CMDL
+
+/*!
+*******************************************************************************
+** \brief   Callback that makes the RUNLOOP toggle a paused state.
 **
 ** \param   optArgPtr   Not used by this function. Satisfies the callback
 **                      interface.
 **
 *******************************************************************************
 */
-static void runloopEnterCmdl (void* optArgPtr)
+static void runloopPause (void* optArgPtr)
 {
-#if RUNLOOP_DEBUG
-    printf("Entering CMDL.\n");
-#endif
-    runloopHandle.flagCmdl = 1;
+    runloopHandle.flagPause = runloopHandle.flagPause ? 0 : 1;
     return;
 }
+#endif // RUNLOOP_WITH_CMDL
 
 /*!
 *******************************************************************************
@@ -241,8 +283,8 @@ static void runloopActivateNewTasks (uint32_t elapsedCycles)
 **          This function also updates the runloopTaskHeadPtr, which points
 **          to the task with the smallest time to its next execution.
 **
-** \param   elapsedCycles   Approxmiate number of system clock cycles since this
-**                          function was called the last time.
+** \param   elapsedCycles   Approxmiate number of system clock cycles since
+**                          this function was called the last time.
 **
 ** \return  - The number of tasks that were executed. If no tasks are
 **            executed, it will return 0.
@@ -275,6 +317,7 @@ static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
             else
             {
                 // Execute task:
+                wdt_reset();
                 result = task_ptr->callbackPtr(task_ptr->callbackArgPtr);
                 tasks_executed++;
                 if (result != RUNLOOP_OK)
@@ -359,6 +402,7 @@ static uint8_t runloopUpdateAndExecuteTasks (uint32_t elapsedCycles)
             if (task_ptr->cyclesToNextExecution == 0)
             {
                 // Execute task:
+                wdt_reset();
                 result = task_ptr->callbackPtr(task_ptr->callbackArgPtr);
                 tasks_executed++;
                 task_ptr->cyclesToNextExecution = task_ptr->cyclesPerPeriod;
@@ -442,13 +486,6 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 *******************************************************************************
 ** \brief   Initialize the RUNLOOP.
 **
-**          TODO: CMDL behavior
-**          This function also registers the 'q' key with a UART rx callback
-**          function that causes the RUNLOOP to enter an interactive
-**          commandline mode. If the CMDL subsystem has not been initialized
-**          by the application, it will be initialized during RUNLOOP
-**          initialization.
-**
 ** \param   timerId     Identifies a hardware timer to be used for timing
 **                      operations in the RUNLOOP. A 16-bit timer allows for
 **                      a greater resolution and may hence generate less
@@ -469,7 +506,7 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 **                      of the timer's prescaled clock, so there is no need to
 **                      use a lower prescaler.
 ** \param   uartHandle  A valid UART handle that will be used to control
-**                      the RUNLOOP via keys and a commandline interface.
+**                      the RUNLOOP via keys or a commandline interface.
 ** \param   taskErrorCallback
 **                      This argument allows to register a callback with the
 **                      runloop that is executed whenever a task returns
@@ -503,7 +540,6 @@ static void runloopPrintTask(uint8_t ii, uint32_t elapsedCycles, runloopTaskT* t
 **
 *******************************************************************************
 */
-// TODO: CMDL while running?
 int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
                      TIMER_ClockPrescalerT timerClockPrescaler,
                      UART_HandleT uartHandle,
@@ -515,8 +551,11 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
     TIMER_WaveGenerationT wave_generation_mode;
     TIMER_OutputModeT output_mode_A;
     TIMER_OutputModeT output_mode_B;
-    UART_RxCallbackOptionsT rx_options;
+#if RUNLOOP_WITH_CMDL
     CMDL_OptionsT cmdl_options;
+#else
+    UART_RxCallbackOptionsT rx_options;
+#endif
 
     if (runloopHandle.initialized)
     {
@@ -541,40 +580,38 @@ int8_t RUNLOOP_Init (TIMER_TimerIdT timerId,
         return (RUNLOOP_ERR_TIMER_INITIALIZATION);
     }
 
-    // Register 'q' key callback for interactive commandline mode:
+#if RUNLOOP_WITH_CMDL
+    memset (&cmdl_options, 0, sizeof(cmdl_options));
+    cmdl_options.flushRxAfterExec = 0;
+    result = CMDL_Init(uartHandle, runloopCmdlExecTrigger, cmdl_options);
+    if (result)
+    {
+        (void)TIMER_Exit(runloopTimerHandle);
+        return result;
+    }
+    // Register "pause" command to pause the RUNLOOP:
+    result = CMDL_RegisterCommand (&runloopPause, "pause");
+    if (result != CMDL_OK)
+    {
+        (void)TIMER_Exit(runloopTimerHandle);
+        return result;
+    }
+#else // RUNLOOP_WITH_CMDL
+    // Register 'q' key callback to pause the RUNLOOP:
     memset(&rx_options, 0, sizeof(rx_options));
     rx_options.execOnRxWait = 0;
     rx_options.writeRxToBuffer = 0;
     result = UART_RegisterRxCallback(uartHandle,
                                      (uint8_t)'q',
-                                     runloopEnterCmdl,
+                                     &runloopPause,
                                      NULL,
                                      rx_options);
     if (result)
     {
-        // Exit TIMER:
         (void)TIMER_Exit(runloopTimerHandle);
-        // Return UART specific error code:
         return result;
     }
-
-    // Initialize CMDL if not done so by the application:
-    if ( ! CMDL_IsInitialized() )
-    {
-        memset (&cmdl_options, 0, sizeof(cmdl_options));
-        cmdl_options.flushRxAfterExec = 1;
-        cmdl_options.flushTxOnExit = 1;
-        result = CMDL_Init(uartHandle, cmdl_options);
-        if (result)
-        {
-            // Try to unregister previously registered RX callback:
-            (void) UART_UnregisterRxCallback(uartHandle, (uint8_t)'q');
-            // Exit TIMER:
-            (void) TIMER_Exit(runloopTimerHandle);
-            // Return CMDL specific error code:
-            return result;
-        }
-    }
+#endif // RUNLOOP_WITH_CMDL
 
 #if RUNLOOP_WITH_UPTIME
     runloopUptimeCycles = 0;
@@ -700,8 +737,15 @@ void RUNLOOP_Run (void)
 
     // Reset flags:
     runloopHandle.running = 1;
-    runloopHandle.flagCmdl = 0;
+    runloopHandle.flagPause = 0;
     runloopHandle.flagStopwatch = 0;
+
+    // Prepare CMDL and print the first prompt:
+#if RUNLOOP_WITH_CMDL
+    runloopHandle.flagCmdl = 0;
+    UART_RxDiscard(runloopUartHandle);
+    CMDL_PrintPrompt(runloopRunningStr);
+#endif
 
     // Stop and reset the timer:
     TIMER_Stop(runloopTimerHandle, TIMER_Stop_ImmediatelyAndReset);
@@ -718,12 +762,24 @@ void RUNLOOP_Run (void)
         // Enable watchdog timer:
         wdt_enable(WDTO_1S);
 
-        // RUNLOOP execution can be temporarily superseded by CMDL execution:
+        // Enter the RUNLOOP:
         while (runloopHandle.running
-        &&    (runloopHandle.flagCmdl == 0))
+        &&    (runloopHandle.flagPause == 0))
         {
             do
             {
+
+#if RUNLOOP_WITH_CMDL
+                // Execute CMDL if a command was typed:
+                if (runloopHandle.flagCmdl)
+                {
+                    CMDL_Execute();
+                    CMDL_PrintPrompt(runloopHandle.flagPause ? \
+                                     runloopPausedStr : runloopRunningStr);
+                    runloopHandle.flagCmdl = 0;
+                }
+#endif
+
                 // Get the elapsed time measured by the stopwatch:
                 TIMER_GetStopwatchSystemClockCycles(runloopTimerHandle,
                                                     &stopwatch_cycles,
@@ -751,7 +807,11 @@ void RUNLOOP_Run (void)
                 wdt_reset();
 
             } while (runloopHandle.running
+#if RUNLOOP_WITH_CMDL
+              &&     (tasks_executed || runloopHandle.flagTaskAdded || runloopHandle.flagCmdl));
+#else
               &&     (tasks_executed || runloopHandle.flagTaskAdded));
+#endif
             // as long as at least one task was executed or added
 
             // Reset the countdown flag:
@@ -788,7 +848,10 @@ void RUNLOOP_Run (void)
 
             // Sleep while the runloop is idle:
             while ((runloopHandle.running)
+#if RUNLOOP_WITH_CMDL
             &&     (runloopHandle.flagCmdl == 0)
+#endif
+            &&     (runloopHandle.flagPause == 0)
             &&     (runloopHandle.flagStopwatch == 0)
             &&     (runloopHandle.flagTaskAdded == 0))
             {
@@ -820,14 +883,26 @@ void RUNLOOP_Run (void)
                 // */
             }
         }
-        if (runloopHandle.flagCmdl)
+        if (runloopHandle.flagPause)
         {
             // Enter interactive command line interface:
             TIMER_Stop(runloopTimerHandle, TIMER_Stop_Immediately);
             wdt_disable();
-            CMDL_Run();
+            // Active waiting while RUNLOOP execution is paused:
+            while (runloopHandle.flagPause)
+            {
+#if RUNLOOP_WITH_CMDL
+                // Execute CMDL if a command was typed:
+                if (runloopHandle.flagCmdl)
+                {
+                    CMDL_Execute();
+                    CMDL_PrintPrompt(runloopHandle.flagPause ? \
+                                     runloopPausedStr : runloopRunningStr);
+                    runloopHandle.flagCmdl = 0;
+                }
+#endif
+            }
             UART_TxFlush(runloopUartHandle);
-            runloopHandle.flagCmdl = 0;
             TIMER_Start(runloopTimerHandle);
         }
     }

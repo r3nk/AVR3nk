@@ -35,6 +35,11 @@
 #define RUNLOOP_MAX_NUMBER_OF_TASKS         10
 #endif
 
+//! Set to 1 to enable the interactive commandline interface in the runloop.
+#ifndef RUNLOOP_WITH_CMDL
+#define RUNLOOP_WITH_CMDL                   1
+#endif
+
 //! Set to 1 to enable the uptime feature of the runloop.
 #ifndef RUNLOOP_WITH_UPTIME
 #define RUNLOOP_WITH_UPTIME                 1
@@ -43,7 +48,7 @@
 /*! If RUNLOOP_WITH_UPTIME is enabled, this defines the minimum
 **  uptime update interval in milliseconds. This setting is only
 **  needed if the uptime is read from interrupt service routines
-**  since the uptime is updated before task execution anyway.
+**  since the uptime is always updated before task execution.
 **  If set to 0, the uptime will be updated only before task
 **  execution in the runloop, which is the recommended setting in
 **  case that the uptime is only read by runloop tasks. The value
