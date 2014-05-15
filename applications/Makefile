@@ -8,7 +8,7 @@
 ## Available Make targets:
 ## all [default], clean, headers, build
 ##
-## Copyright (C) 2009-2013 Robin Klose
+## Copyright (C) 2009-2014 Robin Klose
 ##
 ## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
@@ -22,9 +22,8 @@
 TOPDIR := ..
 SUBDIR := applications
 
-DIRECTORIES := demo_cmdl
-DIRECTORIES += demo_sensor
-DIRECTORIES += CAN-inspector
+DIRECTORIES := CAN-inspector
+#DIRECTORIES += demo_sensor
 
 ################################################################
 ## Load Configuration

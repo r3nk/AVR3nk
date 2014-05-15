@@ -12,7 +12,7 @@
 ## Available Make targets:
 ## all [default], clean, headers, build, install
 ##
-## Copyright (C) <year> <author>
+## Copyright (C) 2014-2014 Robin Klose
 ##
 ## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
