@@ -35,15 +35,15 @@
 
 // Critical Section handling by disabling the corresponding interrupts:
 #if MCP2515_USE_RX_INT
-#define MCP2515_ENTER_CS    EIMSK &= ~(1 << MCP2515_INTNO_MAIN)
-#define MCP2515_LEAVE_CS    EIMSK |=  (1 << MCP2515_INTNO_MAIN)
-#else
 #define MCP2515_ENTER_CS    EIMSK &= ~((1 << MCP2515_INTNO_MAIN) | \
                                        (1 << MCP2515_INTNO_RXB0) | \
-                                       (1 << MCP2515_INTNO_RXB1));
+                                       (1 << MCP2515_INTNO_RXB1))
 #define MCP2515_LEAVE_CS    EIMSK |=  ((1 << MCP2515_INTNO_MAIN) | \
                                        (mcp2515State.rxIrqEnable << MCP2515_INTNO_RXB0) | \
-                                       (mcp2515State.rxIrqEnable << MCP2515_INTNO_RXB1));
+                                       (mcp2515State.rxIrqEnable << MCP2515_INTNO_RXB1))
+#else
+#define MCP2515_ENTER_CS    EIMSK &= ~(1 << MCP2515_INTNO_MAIN)
+#define MCP2515_LEAVE_CS    EIMSK |=  (1 << MCP2515_INTNO_MAIN)
 #endif // MCP2515_USE_RX_INT
 
 // Debugging print:
@@ -626,16 +626,6 @@ void MCP2515_Exit(void)
 */
 void MCP2515_SetRxCallback(MCP2515_RxCallbackT rxCallback)
 {
-#if MCP2515_USE_RX_INT
-    MCP2515_ENTER_CS;
-    mcp2515RxCallback = rxCallback;
-    if(mcp2515State.initialized)
-    {
-        mcp2515State.rxIrqEnable = rxCallback ? 1 : 0;
-    }
-    MCP2515_LEAVE_CS;
-    return;
-#else
     uint8_t eimsk_save;
 
     // DO NOT use LEAVE_CS here, since interrupts may still be disabled
@@ -646,19 +636,26 @@ void MCP2515_SetRxCallback(MCP2515_RxCallbackT rxCallback)
     {
         mcp2515State.rxIrqEnable = rxCallback ? 1 : 0;
 
-        // clear rx buffers
+        // clear rx buffers:
         mcp2515CmdBitModify( MCP2515_CANINTF, \
                             (1 << MCP2515_RX1IF) | (1 << MCP2515_RX0IF), 0);
 
-        // modify interrupt mask
+#if !MCP2515_USE_RX_INT
+        // modify interrupt mask:
         mcp2515CmdBitModify( \
             MCP2515_CANINTE, \
             (1 << MCP2515_RX1IE) | (1 << MCP2515_RX0IE), \
             rxCallback ? (1 << MCP2515_RX1IE) | (1 << MCP2515_RX0IE) : 0);
+#endif // !MCP2515_USE_RX_INT
     }
     EIMSK  = eimsk_save;
-    return;
+#if MCP2515_USE_RX_INT
+    if(mcp2515State.rxIrqEnable)
+    {
+        EIMSK |= ((1 << MCP2515_INTNO_RXB0) | (1 << MCP2515_INTNO_RXB1));
+    }
 #endif // MCP2515_USE_RX_INT
+    return;
 }
 
 /*!
@@ -739,7 +736,13 @@ MCP2515_TxBufferIdT MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
     uint8_t val, command, ii;
     MCP2515_TxPriorityT current_prio;
 
-    // quickly read status bits:
+    // check if driver is initialized:
+    if(mcp2515State.initialized == 0)
+    {
+        return 0;
+    }
+
+    // read status bits:
     MCP2515_ENTER_CS;
     SET_LOW(MCP2515_CS);
     (void)SPI_M_Transceive(MCP2515_SPI_READ_STATUS);
