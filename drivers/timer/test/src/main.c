@@ -40,6 +40,8 @@
 static int8_t appInit(void);
 static int    appStdioPut(char chr, FILE* streamPtr);
 static int    appStdioGet(FILE* streamPtr);
+static void   appCmdlExec(void* optArgPtr);
+static void   appCmdlStop(uint8_t argc, char* argv[]);
 static void   appTimerFinishedCallback(void* optArg);
 static void   appTestOneShot(uint8_t argc, char* argv[]);
 static void   appTestCountdown(uint8_t argc, char* argv[]);
@@ -52,6 +54,11 @@ static void   appTestCountdown(uint8_t argc, char* argv[]);
 static UART_HandleT appUartHandle = NULL;
 static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
 static TIMER_HandleT appTimerHandle = NULL;
+static struct
+{
+    volatile uint8_t cmdlRunning : 1;
+    volatile uint8_t cmdlExec : 1;
+} appFlags;
 
 
 //*****************************************************************************
@@ -67,7 +74,7 @@ static TIMER_HandleT appTimerHandle = NULL;
 **
 ** \return
 **          - 0 on success.
-**          - -1 on error.
+**          - 1 on error.
 **
 *******************************************************************************
 */
@@ -75,7 +82,7 @@ static int8_t appInit(void)
 {
     UART_LedParamsT led_params;
     CMDL_OptionsT cmdl_options;
-    int8_t result;
+    uint8_t result;
 
     // Initialize UART and STDIO:
     memset(&led_params, 0, sizeof(led_params));
@@ -95,7 +102,7 @@ static int8_t appInit(void)
                               &led_params);
     if(appUartHandle == NULL)
     {
-        return(-1);
+        return(1);
     }
 
     // Assign stdio:
@@ -108,15 +115,15 @@ static int8_t appInit(void)
     // Initialize CMDL:
     memset(&cmdl_options, 0, sizeof(cmdl_options));
     cmdl_options.flushRxAfterExec = 1;
-    cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(appUartHandle, cmdl_options);
+    result = CMDL_Init(appUartHandle, &appCmdlExec, cmdl_options);
     if(result != CMDL_OK)
     {
         printf("CMDL_Init: %d\n", result);
-        return(-1);
+        return(1);
     }
 
     // Register commands:
+    CMDL_RegisterCommand(appCmdlStop, "exit");
     CMDL_RegisterCommand(appTestOneShot, "oneshot");
     CMDL_RegisterCommand(appTestCountdown, "countdown");
 
@@ -163,6 +170,35 @@ static int appStdioGet(FILE* streamPtr)
 
 /*!
 *******************************************************************************
+** \brief   Trigger commandline execution.
+**
+** \param   optArgPtr   Not used. Satisfies the interface as a UART callback.
+**
+*******************************************************************************
+*/
+static void appCmdlExec(void* optArgPtr)
+{
+    appFlags.cmdlExec = 1;
+    return;
+}
+
+/*!
+*******************************************************************************
+** \brief   Stop the commandline.
+**
+** \param   argc    Not used.
+** \param   argv    Not used.
+**
+*******************************************************************************
+*/
+static void appCmdlStop(uint8_t argc, char* argv[])
+{
+    appFlags.cmdlRunning = 0;
+    return;
+}
+
+/*!
+*******************************************************************************
 ** \brief   A callback that is triggered by the timer overflow.
 **
 ** \param   optArg  Will be interpreted as a uint8_t* flag that will be written
@@ -182,8 +218,8 @@ static void appTimerFinishedCallback(void* optArg)
 ** \brief   Test the TIMERs one-shot feature.
 **
 **          This function runs TIMER_OneShot() for several prescalers and
-**          prints the number of system clock cycles that have elapsed when
-**          the timer effectively stopped.
+**          prints the number of total (measured) elapsed system clock cycles
+**          from start to stop.
 **
 ** \param   argc    Argument count.
 ** \param   argv    Argument vector. Pass a number to identify a timer.
@@ -192,7 +228,7 @@ static void appTimerFinishedCallback(void* optArg)
 */
 static void appTestOneShot(uint8_t argc, char* argv[])
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     uint8_t timer_num;
     volatile uint8_t finished = 0;
     uint32_t clock_cycles = 0;
@@ -246,44 +282,40 @@ static void appTestOneShot(uint8_t argc, char* argv[])
         printf ("Error during TIMER_SetOverflowCallback().\n");
     }
 
-    TIMER_ResetStopwatch(appTimerHandle, TIMER_Stopwatch_On);
+    TIMER_EnableDisableStopwatch(appTimerHandle, TIMER_Stopwatch_Enable);
     TIMER_SetClockPrescaler(appTimerHandle, TIMER_ClockPrescaler_1024);
     TIMER_OneShot(appTimerHandle);
     finished = 0;
     while(!finished);
-    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles);
+    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles, TIMER_Stopwatch_Reset);
     printf("OneShot [1024]: %lu\n", clock_cycles);
 
-    TIMER_ResetStopwatch(appTimerHandle, TIMER_Stopwatch_On);
     TIMER_SetClockPrescaler(appTimerHandle, TIMER_ClockPrescaler_256);
     TIMER_OneShot(appTimerHandle);
     finished = 0;
     while(!finished);
-    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles);
+    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles, TIMER_Stopwatch_Reset);
     printf("OneShot  [256]: %lu\n", clock_cycles);
 
-    TIMER_ResetStopwatch(appTimerHandle, TIMER_Stopwatch_On);
     TIMER_SetClockPrescaler(appTimerHandle, TIMER_ClockPrescaler_64);
     TIMER_OneShot(appTimerHandle);
     finished = 0;
     while(!finished);
-    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles);
+    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles, TIMER_Stopwatch_Reset);
     printf("OneShot   [64]: %lu\n", clock_cycles);
 
-    TIMER_ResetStopwatch(appTimerHandle, TIMER_Stopwatch_On);
     TIMER_SetClockPrescaler(appTimerHandle, TIMER_ClockPrescaler_8);
     TIMER_OneShot(appTimerHandle);
     finished = 0;
     while(!finished);
-    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles);
+    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles, TIMER_Stopwatch_Reset);
     printf("OneShot    [8]: %lu\n", clock_cycles);
 
-    TIMER_ResetStopwatch(appTimerHandle, TIMER_Stopwatch_On);
     TIMER_SetClockPrescaler(appTimerHandle, TIMER_ClockPrescaler_1);
     TIMER_OneShot(appTimerHandle);
     finished = 0;
     while(!finished);
-    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles);
+    TIMER_GetStopwatchSystemClockCycles(appTimerHandle, &clock_cycles, TIMER_Stopwatch_Reset);
     printf("OneShot    [1]: %lu\n", clock_cycles);
 
     TIMER_Exit(appTimerHandle);
@@ -379,14 +411,31 @@ static void appTestCountdown(uint8_t argc, char* argv[])
 **
 ** \return
 **          - 0 on success.
-**          - -1 on error.
+**          - 1 on error.
 **
 *******************************************************************************
 */
 int main(int argc, char* argv[])
 {
-    if(appInit()) return(-1);
-    CMDL_Run();
+    if(appInit()) return(1);
+
+    // Init CMDL state:
+    appFlags.cmdlRunning = 1;
+    appFlags.cmdlExec = 0;
+
+    // Print the prompt:
+    CMDL_PrintPrompt(NULL);
+
+    // Wait for commands:
+    while(appFlags.cmdlRunning)
+    {
+        if(appFlags.cmdlExec) // start execution
+        {
+            CMDL_Execute();
+            CMDL_PrintPrompt(NULL);
+            appFlags.cmdlExec = 0;
+        }
+    }
     UART_TxFlush(appUartHandle);
     return(0);
 }
