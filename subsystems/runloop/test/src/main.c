@@ -23,6 +23,8 @@
 #include <drivers/macros_pin.h>
 #include <drivers/uart.h>
 #include <drivers/timer.h>
+#include <drivers/mcp2515.h>
+#include <drivers/mcp2515_config.h>
 #include <subsystems/cmdl.h>
 #include <subsystems/runloop.h>
 
@@ -50,14 +52,17 @@ static void    appSyncErrorCallback (uint8_t taskId, uint16_t dropCount);
 static uint8_t appToggleLedTask (void* optArgPtr);
 static uint8_t appPrintUptimeTask (void* optArgPtr);
 static uint8_t appActiveWaitingTask (void* optArgPtr);
+static uint8_t appSendCanMessageTask (void* optArgPtr);
 #if RUNLOOP_WITH_CMDL
 static void    appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[]);
 static void    appAddPrintUptimeTaskViaCmdl (uint8_t argc, char* argv[]);
 static void    appAddActiveWaitingTaskViaCmdl (uint8_t argc, char* argv[]);
+static void    appAddSendCanMessageTaskViaCmdl (uint8_t argc, char* argv[]);
 #else
 static void    appAddToggleLedTaskViaKey (void* optArgPtr);
 static void    appAddPrintUptimeTaskViaKey (void* optArgPtr);
 static void    appAddActiveWaitingTaskViaKey (void* optArgPtr);
+static void    appAddSendCanMessageTaskViaKey (void* optArgPtr);
 #endif
 
 
@@ -68,8 +73,15 @@ static void    appAddActiveWaitingTaskViaKey (void* optArgPtr);
 static uint8_t appMCUSR __attribute__((section(".noinit")));
 static UART_HandleT appUartHandle = NULL;
 static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
-static uint8_t appPinIsHigh = 0;
+static struct
+{
+    uint8_t pinIsHigh : 1;
+    volatile uint8_t canTx : 1;
+} appFlags;
 static uint32_t appActiveWaitingTaskDelayMs = 0;
+static MCP2515_InitParamsT appCanParams;
+MCP2515_CanAMessageT appCanMessage;
+
 
 //*****************************************************************************
 //**************************** LOCAL FUNCTIONS ********************************
@@ -90,7 +102,7 @@ static uint32_t appActiveWaitingTaskDelayMs = 0;
 */
 static int8_t appInit (void)
 {
-    int8_t result;
+    uint8_t result;
     UART_LedParamsT led_params;
 #if (RUNLOOP_WITH_CMDL == 0)
     UART_RxCallbackOptionsT uart_cb_opts;
@@ -159,6 +171,13 @@ static int8_t appInit (void)
         printf ("CMDL_RegisterCommand: %d\n", result);
         return result;
     }
+    result = CMDL_RegisterCommand(appAddSendCanMessageTaskViaCmdl,
+                                  "can");
+    if (result != CMDL_OK)
+    {
+        printf ("CMDL_RegisterCommand: %d\n", result);
+        return result;
+    }
 #else
     // Register UART callback that adds a task to the runloop:
     memset(&uart_cb_opts, 0, sizeof(uart_cb_opts));
@@ -194,10 +213,40 @@ static int8_t appInit (void)
         printf("UART_RegisterRxCallback: %d\n", result);
         return(result);
     }
+    result = UART_RegisterRxCallback(appUartHandle,
+                                     (uint8_t)'c',
+                                     appAddSendCanMessageTaskViaKey,
+                                     NULL,
+                                     uart_cb_opts);
+    if (result != UART_OK)
+    {
+        printf("UART_RegisterRxCallback: %d\n", result);
+        return(result);
+    }
 #endif
 
+    // Set up CAN driver:
+    memset(&appCanParams, 0, sizeof(appCanParams));
+    appCanParams.initSPI = 1;
+    appCanParams.wakeupLowPassFilter = 0;
+    appCanParams.baudRatePrescaler = MCP2515_AUTO_BRP;
+    appCanParams.synchronisationJumpWidth = MCP2515_AUTO_SJW;
+    appCanParams.propagationSegmentLength = MCP2515_AUTO_PRSEG;
+    appCanParams.phaseSegment1Length = MCP2515_AUTO_PHSEG1;
+    appCanParams.phaseSegment2Length = MCP2515_AUTO_PHSEG2;
+    appCanParams.samplePointCount = MCP2515_SAM_3;
+    appCanParams.rolloverMode = MCP2515_ROLLOVER_ENABLE;
+    appCanParams.oneShotMode = MCP2515_ONESHOT_DISABLE;
+    appCanParams.rxBuffer0Mask = 0x000; // accept all
+    appCanParams.rxBuffer1Mask = 0x000; // accept all
+    result = MCP2515_Init(&appCanParams);
+    if(result != MCP2515_OK)
+    {
+        printf("MCP2515_Init: %d\n", result);
+    }
+
     // Set the application's LED as output:
-    appPinIsHigh = 0;
+    appFlags.pinIsHigh = 0;
     SET_LOW(APP_LED);
     SET_OUTPUT(APP_LED);
 
@@ -283,15 +332,15 @@ static void appSyncErrorCallback (uint8_t taskId, uint16_t dropCount)
 */
 static uint8_t appToggleLedTask (void* optArgPtr)
 {
-    if (appPinIsHigh)
+    if (appFlags.pinIsHigh)
     {
         SET_LOW(APP_LED);
-        appPinIsHigh = 0;
+        appFlags.pinIsHigh = 0;
     }
     else
     {
         SET_HIGH(APP_LED);
-        appPinIsHigh = 1;
+        appFlags.pinIsHigh = 1;
     }
     return (RUNLOOP_OK);
 }
@@ -347,12 +396,39 @@ static uint8_t appActiveWaitingTask (void* optArgPtr)
     return (RUNLOOP_OK);
 }
 
+/*!
+*******************************************************************************
+** \brief   Transmit a can message.
+**
+** \param   optArgPtr   Should point to the message to transmit.
+**
+*******************************************************************************
+*/
+static uint8_t appSendCanMessageTask (void* optArgPtr)
+{
+    MCP2515_CanAMessageT* can_msg_ptr = (MCP2515_CanAMessageT*) optArgPtr;
+    MCP2515_TxParamsT can_params;
+    MCP2515_TxBufferIdT buffer_id;
+
+    if (appFlags.canTx == 0)
+    {
+        return (RUNLOOP_OK_TASK_ABORT);
+    }
+
+    memset(&can_params, 0, sizeof(can_params));
+    can_params.bufferId = MCP2515_TX_BUFFER_0;
+    can_params.priority = MCP2515_TX_PRIORITY_0;
+    buffer_id = MCP2515_Transmit(can_msg_ptr, can_params);
+    if(buffer_id == 0) printf("MCP2515_Transmit: No transmit buffer free.\n");
+    return (RUNLOOP_OK);
+}
+
 #if RUNLOOP_WITH_CMDL
 /*!
 *******************************************************************************
 ** \brief   Callback for the CMDL which adds the LED toggle task to the RUNLOOP.
 **
-** \param   argc    The argument count is should be 4.
+** \param   argc    The argument count should be 4.
 ** \param   argv    The argument vector is expected to contain the command name,
 **                  the number of executions of the task, the task's period
 **                  in ms and the initial delay of the task in ms.
@@ -361,7 +437,7 @@ static uint8_t appActiveWaitingTask (void* optArgPtr)
 */
 static void appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[])
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     uint8_t task_id = 0;
 
     if (argc != 4)
@@ -369,7 +445,7 @@ static void appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[])
         printf ("Usage: %s <numOfExec> <periodMs> <initialDelayMs>\n", argv[0]);
         return;
     }
-    result = RUNLOOP_AddTask(appToggleLedTask,
+    result = RUNLOOP_AddTask(&appToggleLedTask,
                              NULL,
                              (uint16_t)strtoul(argv[1], NULL, 0),
                              strtoul(argv[2], NULL, 0),
@@ -391,7 +467,7 @@ static void appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[])
 ** \brief   Callback for the CMDL which adds the uptime printing task to
 **          the RUNLOOP.
 **
-** \param   argc    The argument count is should be 1 or 4.
+** \param   argc    The argument count should be 1 or 4.
 ** \param   argv    The argument vector is expected to contain either
 **                  - only the command name, or
 **                  - the command name, the number of executions of the task,
@@ -402,7 +478,7 @@ static void appAddToggleLedTaskViaCmdl (uint8_t argc, char* argv[])
 */
 static void appAddPrintUptimeTaskViaCmdl (uint8_t argc, char* argv[])
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     uint8_t task_id = 0;
 
     if (argc == 1)
@@ -411,7 +487,7 @@ static void appAddPrintUptimeTaskViaCmdl (uint8_t argc, char* argv[])
     }
     else if (argc == 4)
     {
-        result = RUNLOOP_AddTask(appPrintUptimeTask,
+        result = RUNLOOP_AddTask(&appPrintUptimeTask,
                                  NULL,
                                  (uint16_t)strtoul(argv[1], NULL, 0),
                                  strtoul(argv[2], NULL, 0),
@@ -439,7 +515,7 @@ static void appAddPrintUptimeTaskViaCmdl (uint8_t argc, char* argv[])
 ** \brief   Callback for the CMDL which adds the active waiting task to the
 **          RUNLOOP.
 **
-** \param   argc    The argument count is should be 5.
+** \param   argc    The argument count should be 5.
 ** \param   argv    The argument vector is expected to contain the command name,
 **                  the number of milliseconds for active waiting, the number
 **                  of executions of the task, the task's period in ms and
@@ -449,7 +525,7 @@ static void appAddPrintUptimeTaskViaCmdl (uint8_t argc, char* argv[])
 */
 static void appAddActiveWaitingTaskViaCmdl (uint8_t argc, char* argv[])
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     uint8_t task_id = 0;
 
     if (argc != 5)
@@ -458,7 +534,7 @@ static void appAddActiveWaitingTaskViaCmdl (uint8_t argc, char* argv[])
         return;
     }
     appActiveWaitingTaskDelayMs = strtoul(argv[1], NULL, 0);
-    result = RUNLOOP_AddTask(appActiveWaitingTask,
+    result = RUNLOOP_AddTask(&appActiveWaitingTask,
                              (void*)&appActiveWaitingTaskDelayMs,
                              (uint16_t)strtoul(argv[2], NULL, 0),
                              strtoul(argv[3], NULL, 0),
@@ -475,6 +551,58 @@ static void appAddActiveWaitingTaskViaCmdl (uint8_t argc, char* argv[])
     return;
 }
 
+/*!
+*******************************************************************************
+** \brief   Callback for the CMDL which adds the CAN transmission task to the
+**          RUNLOOP.
+**
+** \param   argc    The argument count should be 7 or greater.
+** \param   argv    The argument vector is expected to contain the command name,
+**                  the number of executions of the task, the task's period in
+**                  ms, the initial delay of the task in ms, the CAN message
+**                  ID (standard frame), the RTR bit, the data length and
+**                  the data bytes.
+**
+*******************************************************************************
+*/
+static void appAddSendCanMessageTaskViaCmdl (uint8_t argc, char* argv[])
+{
+    uint8_t ii = 0;
+    uint8_t result = 0;
+    uint8_t task_id = 0;
+
+    if (argc < 7)
+    {
+        printf ("Usage: %s <numOfExec> <periodMs> <initialDelayMs> <sid> <rtr> <dlc> <data>*\n", argv[0]);
+        return;
+    }
+
+    appCanMessage.sid = strtoul(argv[4], NULL, 0) & 0x7FF;
+    appCanMessage.rtr = strtoul(argv[5], NULL, 0) ? 1 : 0;
+    appCanMessage.dlc = strtoul(argv[6], NULL, 0);
+    memset(&appCanMessage.dataArray, 0, sizeof(appCanMessage.dataArray));
+    for(ii = 0; ((ii < appCanMessage.dlc) && (ii < (argc - 7))); ii++)
+    {
+        appCanMessage.dataArray[ii] = strtoul(argv[ii+7], NULL, 0) & 0xFF;
+    }
+    result = RUNLOOP_AddTask(&appSendCanMessageTask,
+                             (void*)&appCanMessage,
+                             (uint16_t)strtoul(argv[1], NULL, 0),
+                             strtoul(argv[2], NULL, 0),
+                             strtoul(argv[3], NULL, 0),
+                             &task_id);
+    if (result != (RUNLOOP_OK))
+    {
+        printf("Error in RUNLOOP_AddTask(): %d\n", result);
+    }
+    else
+    {
+        printf("Task added. Task ID: %u\n", task_id);
+    }
+    appFlags.canTx = 1;
+    return;
+}
+
 #else // RUNLOOP_WITH_CMDL
 
 /*!
@@ -487,9 +615,9 @@ static void appAddActiveWaitingTaskViaCmdl (uint8_t argc, char* argv[])
 */
 static void appAddToggleLedTaskViaKey (void* optArgPtr)
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     uint8_t task_id = 0;
-    result = RUNLOOP_AddTask(appToggleLedTask,
+    result = RUNLOOP_AddTask(&appToggleLedTask,
                              NULL,   // optional argument
                              16,     // number of executions
                              500,    // period in ms
@@ -517,9 +645,9 @@ static void appAddToggleLedTaskViaKey (void* optArgPtr)
 */
 static void appAddPrintUptimeTaskViaKey (void* optArgPtr)
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     uint8_t task_id = 0;
-    result = RUNLOOP_AddTask(appPrintUptimeTask,
+    result = RUNLOOP_AddTask(&appPrintUptimeTask,
                              NULL,  // optional argument
                              1,     // one execution
                              0,     // period in ms (may be 0 for non-periodic tasks)
@@ -547,10 +675,10 @@ static void appAddPrintUptimeTaskViaKey (void* optArgPtr)
 */
 static void appAddActiveWaitingTaskViaKey (void* optArgPtr)
 {
-    int8_t result = 0;
+    uint8_t result = 0;
     uint8_t task_id = 0;
     appActiveWaitingTaskDelayMs = 1000; // active waiting time in ms
-    result = RUNLOOP_AddTask(appActiveWaitingTask,
+    result = RUNLOOP_AddTask(&appActiveWaitingTask,
                              &appActiveWaitingTaskDelayMs,
                              1,          // number of executions
                              0,          // period in ms
@@ -566,6 +694,51 @@ static void appAddActiveWaitingTaskViaKey (void* optArgPtr)
     }
     return;
 }
+
+/*!
+*******************************************************************************
+** \brief   Callback for the CMDL which adds the CAN transmission task to the
+**          RUNLOOP.
+**
+** \param   optArgPtr   Not used.
+**
+*******************************************************************************
+*/
+static void appAddSendCanMessageTaskViaKey (void* optArgPtr)
+{
+    uint8_t result = 0;
+    uint8_t task_id = 0;
+
+    appCanMessage.sid = 0x84;
+    appCanMessage.rtr = 0;
+    appCanMessage.dlc = 2;
+    appCanMessage.dataArray[0] = 0x12;
+    appCanMessage.dataArray[1] = 0x23;
+
+    if (appFlags.canTx)
+    {
+        // Let the CAN task terminate if already running:
+        appFlags.canTx = 0;
+        return;
+    }
+    result = RUNLOOP_AddTask(&appSendCanMessageTask,
+                             (void*)&appCanMessage,
+                             0,   // infinite execution
+                             100, // 100 ms interval
+                             0,   // no initial delay
+                             &task_id);
+    if (result != (RUNLOOP_OK))
+    {
+        printf("Error in RUNLOOP_AddTask(): %d\n", result);
+    }
+    else
+    {
+        printf("Task added. Task ID: %u\n", task_id);
+    }
+    appFlags.canTx = 1;
+    return;
+}
+
 #endif // RUNLOOP_WITH_CMDL
 
 
