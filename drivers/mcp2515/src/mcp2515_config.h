@@ -17,7 +17,7 @@
 **
 ** \sa      For bit timing settings see the example in MCP2515-I-P.pdf chapter 5.2
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -61,7 +61,7 @@
     #define MCP2515_AUTO_PRSEG          MCP2515_125KBIT_8000000HZ_PRSEG
     #define MCP2515_AUTO_PHSEG1         MCP2515_125KBIT_8000000HZ_PHSEG1
     #define MCP2515_AUTO_PHSEG2         MCP2515_125KBIT_8000000HZ_PHSEG2
-#endif 
+#endif
 
 #if F_MCP2515 == 18432000
     #define MCP2515_AUTO_BRP            MCP2515_125KBIT_18432000HZ_BRP
@@ -69,7 +69,7 @@
     #define MCP2515_AUTO_PRSEG          MCP2515_125KBIT_18432000HZ_PRSEG
     #define MCP2515_AUTO_PHSEG1         MCP2515_125KBIT_18432000HZ_PHSEG1
     #define MCP2515_AUTO_PHSEG2         MCP2515_125KBIT_18432000HZ_PHSEG2
-#endif 
+#endif
 
 #if F_MCP2515 == 20000000
     #define MCP2515_AUTO_BRP            MCP2515_125KBIT_20000000HZ_BRP
@@ -77,7 +77,7 @@
     #define MCP2515_AUTO_PRSEG          MCP2515_125KBIT_20000000HZ_PRSEG
     #define MCP2515_AUTO_PHSEG1         MCP2515_125KBIT_20000000HZ_PHSEG1
     #define MCP2515_AUTO_PHSEG2         MCP2515_125KBIT_20000000HZ_PHSEG2
-#endif 
+#endif
 
 //*****************************************************************************
 //**************** OSCILLATOR FREQUENCY DEPENDENT SETTINGS ********************

@@ -8,7 +8,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -78,10 +78,10 @@ static struct
 **
 *******************************************************************************
 */
-int8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
-                   SPI_DataOrderT dataOrder,
-                   SPI_ClockPolarityT clockPolarity,
-                   SPI_ClockPhaseT clockPhase)
+uint8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
+                    SPI_DataOrderT dataOrder,
+                    SPI_ClockPolarityT clockPolarity,
+                    SPI_ClockPhaseT clockPhase)
 {
     uint8_t accu = 0;
 
@@ -91,7 +91,10 @@ int8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
 
     // set up pin configuration:
 
-    // Set SS pin as output and drive high:
+    // See ATmega644p chapter 15.3
+    // If set as input, the SS pin can change the SPI master to a slave.
+    // This driver doesn't handle this, so set pin as output and use as CS.
+    // CS pin (chip select) is then handled by the respective device driver.
     DDR_SPI  |=  (1 << DD_SS);
     PORT_SPI |=  (1 << PORT_SS);
 
@@ -156,7 +159,7 @@ int8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
 **
 *******************************************************************************
 */
-int8_t SPI_M_IsInitialized (void)
+uint8_t SPI_M_IsInitialized (void)
 {
     return(spimState.initialized);
 }

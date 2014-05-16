@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -58,16 +58,18 @@
 //*****************************************************************************
 
 /*! SPI_M specific error base */
-#define SPI_M_ERR_BASE              0
+#ifndef SPI_M_ERR_BASE
+#define SPI_M_ERR_BASE              30
+#endif
 
 /*! SPI_M returns with no errors. */
 #define SPI_M_OK                    0
 
 /*! A bad parameter has been passed. */
-#define SPI_M_ERR_BAD_PARAMETER     SPI_M_ERR_BASE - 1
+#define SPI_M_ERR_BAD_PARAMETER     SPI_M_ERR_BASE + 0
 
 /*! Register verification after init failed. */
-#define SPI_M_ERR_VERIFY_FAIL       SPI_M_ERR_BASE - 2
+#define SPI_M_ERR_VERIFY_FAIL       SPI_M_ERR_BASE + 1
 
 //*****************************************************************************
 //******************************** DATA TYPES *********************************
@@ -78,11 +80,11 @@
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-int8_t  SPI_M_Init (SPI_ClockDivisionT clockDivider,
+uint8_t SPI_M_Init (SPI_ClockDivisionT clockDivider,
                     SPI_DataOrderT dataOrder,
                     SPI_ClockPolarityT clockPolarity,
                     SPI_ClockPhaseT clockPhase);
-int8_t  SPI_M_IsInitialized (void);
+uint8_t SPI_M_IsInitialized (void);
 void    SPI_M_SetDataOrder (SPI_DataOrderT dataOrder);
 void    SPI_M_SetClockParity (SPI_ClockPolarityT clockParity);
 void    SPI_M_SetClockPhase (SPI_ClockPhaseT clockPhase);

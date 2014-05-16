@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -85,28 +85,27 @@
 //*****************************************************************************
 
 /*! MCP2515 specific error base */
-#define MCP2515_ERR_BASE                            0
+#ifndef MCP2515_ERR_BASE
+#define MCP2515_ERR_BASE                            40
+#endif
 
 /*! MCP2515 returns with no errors. */
 #define MCP2515_OK                                  0
 
 /*! A bad parameter has been passed. */
-#define MCP2515_ERR_BAD_PARAMETER                   MCP2515_ERR_BASE - 1
+#define MCP2515_ERR_BAD_PARAMETER                   MCP2515_ERR_BASE + 0
 
 /*! The SPI driver has not been initialized. */
-#define MCP2515_ERR_SPI_NOT_INITIALIZED             MCP2515_ERR_BASE - 2
+#define MCP2515_ERR_SPI_NOT_INITIALIZED             MCP2515_ERR_BASE + 1
 
 /*! The MCP2515 driver has already been initialized. */
-#define MCP2515_ERR_ALREADY_INITIALIZED             MCP2515_ERR_BASE - 3
+#define MCP2515_ERR_ALREADY_INITIALIZED             MCP2515_ERR_BASE + 2
 
 /*! Register verification failed. */
-#define MCP2515_ERR_VERIFY_FAIL                     MCP2515_ERR_BASE - 4
-
-/*! There is no transmit buffer free. */
-#define MCP2515_ERR_NO_TRANSMIT_BUFFER_FREE         MCP2515_ERR_BASE - 5
+#define MCP2515_ERR_VERIFY_FAIL                     MCP2515_ERR_BASE + 3
 
 /*! There has no message been received. */
-#define MCP2515_ERR_NO_MESSAGE_RECEIVED             MCP2515_ERR_BASE - 6
+#define MCP2515_ERR_NO_MESSAGE_RECEIVED             MCP2515_ERR_BASE + 4
 
 
 //*****************************************************************************
@@ -275,7 +274,7 @@ typedef struct
 **
 **          The baudRatePrescaler (BRP) is a programmable prescaler which
 **          defines the Time Quantum period (TQ) with respect to the frequency
-**          of the connected oscillator (F_MCP2515). 
+**          of the connected oscillator (F_MCP2515).
 **          TQ = 2 * (BRP + 1) / F_MCP2515
 **
 **          See mcp2515_config.h for automatic configuration settings of the
@@ -314,7 +313,7 @@ typedef struct
 **
 **          The baudRatePrescaler (BRP) is a programmable prescaler which
 **          defines the Time Quantum period (TQ) with respect to the frequency
-**          of the connected oscillator (F_MCP2515). 
+**          of the connected oscillator (F_MCP2515).
 **          TQ = 2 * (BRP + 1) / F_MCP2515
 **
 **          See mcp2515_config.h for automatic configuration settings of the
@@ -511,12 +510,12 @@ typedef void (*MCP2515_ErrorCallbackT) (uint8_t errState);
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-int8_t  MCP2515_Init(const MCP2515_InitParamsT* initParamsPtr);
-int8_t  MCP2515_Exit(void);
+uint8_t MCP2515_Init(const MCP2515_InitParamsT* initParamsPtr);
+void    MCP2515_Exit(void);
 void    MCP2515_SetRxCallback(MCP2515_RxCallbackT rxCallback);
 void    MCP2515_SetTxCallback(MCP2515_TxCallbackT txCallback);
-int8_t  MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
-                         MCP2515_TxParamsT txParams);
+MCP2515_TxBufferIdT MCP2515_Transmit(MCP2515_CanMessageT* messagePtr, \
+                                     MCP2515_TxParamsT txParams);
 
 #if MCP2515_ERROR_CALLBACK_SUPPORT
 void    MCP2515_SetMessageErrorCallback(MCP2515_VoidCallbackT callback);

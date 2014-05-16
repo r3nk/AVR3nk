@@ -11,7 +11,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -128,7 +128,7 @@ uint8_t BUFFER_GetFreeSize(BUFFER_BufT* bufPtr)
 **
 *******************************************************************************
 */
-uint8_t BUFFER_ReadByte(BUFFER_BufT* bufPtr, int8_t* errorCodePtr)
+uint8_t BUFFER_ReadByte(BUFFER_BufT* bufPtr, uint8_t* errorCodePtr)
 {
     uint8_t val;
 
@@ -167,7 +167,7 @@ uint8_t BUFFER_ReadByte(BUFFER_BufT* bufPtr, int8_t* errorCodePtr)
 **
 *******************************************************************************
 */
-uint8_t BUFFER_ReadByteFromTail(BUFFER_BufT* bufPtr, int8_t* errorCodePtr)
+uint8_t BUFFER_ReadByteFromTail(BUFFER_BufT* bufPtr, uint8_t* errorCodePtr)
 {
     uint8_t val;
 
@@ -201,7 +201,7 @@ uint8_t BUFFER_ReadByteFromTail(BUFFER_BufT* bufPtr, int8_t* errorCodePtr)
 **
 *******************************************************************************
 */
-void BUFFER_WriteByte(BUFFER_BufT* bufPtr, uint8_t byte, int8_t* errorCodePtr)
+void BUFFER_WriteByte(BUFFER_BufT* bufPtr, uint8_t byte, uint8_t* errorCodePtr)
 {
     if(bufPtr->used == bufPtr->length)
     {
@@ -245,9 +245,9 @@ void BUFFER_WriteByte(BUFFER_BufT* bufPtr, uint8_t byte, int8_t* errorCodePtr)
 *******************************************************************************
 */
 uint8_t BUFFER_ReadField (BUFFER_BufT* bufPtr,
-                           uint8_t* dstPtr,
-                           uint8_t byteCount,
-                           int8_t* errorCodePtr)
+                          uint8_t* dstPtr,
+                          uint8_t byteCount,
+                          uint8_t* errorCodePtr)
 {
     uint8_t ii;         // temporary counter
     uint8_t count;      // count of bytes actually copied
@@ -302,9 +302,9 @@ uint8_t BUFFER_ReadField (BUFFER_BufT* bufPtr,
 *******************************************************************************
 */
 uint8_t BUFFER_WriteField (BUFFER_BufT* bufPtr,
-                            uint8_t* srcPtr,
-                            uint8_t byteCount,
-                            int8_t* errorCodePtr)
+                           uint8_t* srcPtr,
+                           uint8_t byteCount,
+                           uint8_t* errorCodePtr)
 {
     uint8_t ii;         // temporary counter
     uint8_t count = 0;  // count of bytes actually copied

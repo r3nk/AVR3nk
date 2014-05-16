@@ -6,7 +6,7 @@
 ##
 ## Copyright (C) 2009-2013 Robin Klose
 ##
-## This file is part of AVR3nk, available at 
+## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
 ##
 ################################################################
@@ -29,7 +29,7 @@ HEADERS := src/macros_pin.h
 ## Dependencies
 ################################################################
 
-DEPENDENCIES := 
+DEPENDENCIES :=
 
 ################################################################
 ## Supported MCUs
@@ -48,11 +48,11 @@ OVERRIDE_DEFAULT_TARGETS = 1
 
 default: headers
 
-clean: 
+clean:
 
 headers: $(MCU:%=mcu-install-headers-%)
 
-build: 
+build:
 
 install: headers
 

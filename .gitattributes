@@ -1,0 +1,17 @@
+# Text files (auto detected + patterns) are LF normalized:
+*        text=auto
+*.c      text
+*.h      text
+Makefile text
+
+# Files that will always have CRLF line endings on checkout:
+# *.foo  text eol=crlf
+
+# Binary files (binary is a built-in macro for -text -diff):
+*.o      binary
+*.a      binary
+*.svg    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+

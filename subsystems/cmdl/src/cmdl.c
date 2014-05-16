@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -19,6 +19,7 @@
 #include <avr/version.h>
 #include <drivers/uart.h>
 #include "cmdl.h"
+
 
 //*****************************************************************************
 //*************************** DEFINES AND MACROS ******************************
@@ -42,19 +43,23 @@ typedef struct
 #endif // CMDL_USAGE_STRING_SUPPORT
 } cmdlCommandT;
 
+
 //*****************************************************************************
 //********************** LOCAL FUNCTION DECLARATIONS **************************
 //*****************************************************************************
 
-static void cmdlCallbackExec(void* optArgPtr);
-static void cmdlStop(uint8_t argc, char* argv[]);
 static void cmdlHelp(uint8_t argc, char* argv[]);
 static cmdlCommandT* cmdlFindCommand(char* cmdNamePtr);
+
+#if CMDL_DEBUG
+static void cmdlDumpCmdString(void);
+#endif
 
 //#if ( ( __AVR_LIBC_MAJOR__ < 1 ) || ( __AVR_LIBC_MINOR__ < 6 ) || ( __AVR_LIBC_REVISION__ < 3 ) )
 #if ( __AVR_LIBC_VERSION__ < 10603UL )
 char* strtok (char* s, const char* delim);
 #endif // ( __AVR_LIBC_VERSION__ < 10603UL )
+
 
 //*****************************************************************************
 //**************************** LOCAL VARIABLES ********************************
@@ -64,17 +69,14 @@ char* strtok (char* s, const char* delim);
 volatile static struct
 {
     uint8_t initialized      : 1; //<! Indicates whether CMDL has been initialized
-    uint8_t running          : 1; //<! Indicates whether the command line is running.
-    uint8_t exec             : 1; //<! Indicates whether a program is in execution.
     uint8_t flushRxAfterExec : 1; //<! see description of CMDL_OptionsT
-    uint8_t flushTxOnExit    : 1; //<! see description of CMDL_OptionsT
 } cmdlState;
 
 /*! The associated UART handle. */
 static UART_HandleT cmdlUartHandle;
 
 /*! The prompt string with a leading newline. */
-static char* cmdlPromptStr = "\n" CMDL_PROMPT;
+static char* cmdlPromptStr = CMDL_PROMPT;
 
 /*! String that contains the command string. */
 static char cmdlCmdString[CMDL_MAX_COMMAND_LENGTH + 1];
@@ -82,37 +84,10 @@ static char cmdlCmdString[CMDL_MAX_COMMAND_LENGTH + 1];
 /*! Array of pointers to all registered cmdlCommandT structures. */
 static cmdlCommandT cmdlCmdArray[CMDL_MAX_COMMAND_COUNT];
 
+
 //*****************************************************************************
 //**************************** LOCAL FUNCTIONS ********************************
 //*****************************************************************************
-
-/*!
-*******************************************************************************
-** \brief   Callback that makes the CMDL execute the command in the UART
-**          rx buffer.
-**
-*******************************************************************************
-*/
-static void cmdlCallbackExec(void* optArgPtr)
-{
-    cmdlState.exec = 1;
-    return;
-}
-
-/*!
-*******************************************************************************
-** \brief   Makes CMDL stop commandline execution.
-**
-** \param   argc    not used here
-** \param   argv    not used here
-**
-*******************************************************************************
-*/
-static void cmdlStop(uint8_t argc, char* argv[])
-{
-    cmdlState.running = 0;
-    return;
-}
 
 /*!
 *******************************************************************************
@@ -143,18 +118,18 @@ static void cmdlHelp(uint8_t argc, char* argv[])
                 printf(CMDL_LABEL "%s\n", cmdlCmdArray[ii].namePtr);
             }
         }
-        printf(CMDL_LABEL "for detailed information type \"help <command>\"\n");
+        printf(CMDL_LABEL "For detailed information type: \"help <command>\"\n");
     }
     else // specify a single command
     {
         command_ptr = cmdlFindCommand(argv[1]);
         if(command_ptr == NULL)
         {
-            printf(CMDL_LABEL "unknown command: %s\n", argv[1]);
+            printf(CMDL_LABEL "Unknown command: %s\n", argv[1]);
         }
         else
         {
-            printf(CMDL_LABEL "usage: %s\n", command_ptr->usagePtr);
+            printf(CMDL_LABEL "Usage: %s\n", command_ptr->usagePtr);
         }
     }
 #else // CMDL_USAGE_STRING_SUPPORT
@@ -205,7 +180,7 @@ static cmdlCommandT* cmdlFindCommand(char* cmdNamePtr)
 }
 
 #if CMDL_DEBUG
-void cmdlDumpCmdString(void)
+static void cmdlDumpCmdString(void)
 {
     uint8_t ii;
     printf(CMDL_LABEL_DEBUG "Dumping cmdlCmdString... \n");
@@ -217,6 +192,7 @@ void cmdlDumpCmdString(void)
     return;
 }
 #endif // CMDL_DEBUG
+
 
 //*****************************************************************************
 //*************************** PUBLIC FUNCTIONS ********************************
@@ -231,11 +207,18 @@ void cmdlDumpCmdString(void)
 **          The UART must be initialized before the CMDL. Choose
 **          UART_CharSize_8 and UART_Transceive_RxTx for UART initialization!
 **
+** \param   uartHandle  Identifies a UART port.
+** \param   cmdlExecTriggerPtr
+**                      A function pointer that triggers the execution of
+**                      CMDL_Execute(), e.g., by setting a flag.
+**                      Note that the function pointer should not invoke
+**                      CMDL_Execute() directly as it runs in interrupt context.
 ** \param   options     Options affecting the CMDL behaviour.
 **
 ** \return
 **          - #CMDL_OK on success.
 **          - #CMDL_ERR_UART_NOT_INITIALIZED if the UART is not initialized.
+**          - #CMDL_ERR_BAD_PARAMETER if cmdlExecTriggerPtr is NULL.
 **          - #CMDL_ERR_UART_NOT_OK if the callback functions could not be
 **            registered.
 **          - #CMDL_ERR_NO_COMMAND_SLOT if there are no command slots
@@ -243,19 +226,25 @@ void cmdlDumpCmdString(void)
 **
 *******************************************************************************
 */
-int8_t CMDL_Init(UART_HandleT uartHandle, CMDL_OptionsT options)
+uint8_t CMDL_Init(UART_HandleT uartHandle,
+                  UART_RxCallbackT cmdlExecTriggerPtr,
+                  CMDL_OptionsT options)
 {
-    int8_t ret_code;
+    uint8_t ret_code;
     UART_RxCallbackOptionsT callbackOptions;
 
     if(UART_IsInitialized(uartHandle) == 0)
     {
         return(CMDL_ERR_UART_NOT_INITIALIZED);
     }
-    // erase commands:
+    if (cmdlExecTriggerPtr == NULL)
+    {
+        return (CMDL_ERR_BAD_PARAMETER);
+    }
+    // Erase commands:
     memset(cmdlCmdArray, 0, sizeof(cmdlCmdArray));
 
-    // register backspace callback:
+    // Register backspace callback:
     callbackOptions.execOnRxWait = 0;
     callbackOptions.writeRxToBuffer = 0;
     ret_code = UART_RegisterRxCallback(uartHandle,
@@ -264,39 +253,29 @@ int8_t CMDL_Init(UART_HandleT uartHandle, CMDL_OptionsT options)
                                        uartHandle, callbackOptions);
     if (ret_code != UART_OK)
     {
+        // TODO: just return the UART error code?
+        // -> Yes, when each driver has its own error base.
         return (CMDL_ERR_UART_NOT_OK);
     }
-    // register execute callback:
+    // Register execute callback:
     callbackOptions.execOnRxWait = 0;
     callbackOptions.writeRxToBuffer = 0;
     ret_code = UART_RegisterRxCallback(uartHandle,
                                        0x0A, // line feed (LF)
-                                       cmdlCallbackExec,
+                                       cmdlExecTriggerPtr,
                                        NULL, callbackOptions);
     if (ret_code != UART_OK)
     {
+        // TODO: just return the UART error code?
+        // -> Yes, when each driver has its own error base.
         return (CMDL_ERR_UART_NOT_OK);
     }
 
-    // register internal \c exit command:
-#if CMDL_USAGE_STRING_SUPPORT
-    ret_code = CMDL_RegisterCommand(&cmdlStop,
-                                    "exit",
-                                    "exit");
-#else // #if CMDL_USAGE_STRING_SUPPORT
-    ret_code = CMDL_RegisterCommand(&cmdlStop,
-                                    "exit");
-#endif // #if CMDL_USAGE_STRING_SUPPORT
-    if (ret_code != CMDL_OK)
-    {
-        return (ret_code);
-    }
-
-    // register internal \c help command:
+    // Register internal \c help command:
 #if CMDL_USAGE_STRING_SUPPORT
     ret_code = CMDL_RegisterCommand(&cmdlHelp,
                                     "help",
-                                    "help [commandName]");
+                                    "help <[command]>");
 #else // #if CMDL_USAGE_STRING_SUPPORT
     ret_code = CMDL_RegisterCommand(&cmdlHelp,
                                     "help");
@@ -306,13 +285,11 @@ int8_t CMDL_Init(UART_HandleT uartHandle, CMDL_OptionsT options)
         return (ret_code);
     }
 
-    // apply options and state:
+    // Apply options and state:
     cmdlUartHandle = uartHandle;
-    cmdlState.flushRxAfterExec  = options.flushRxAfterExec;
-    cmdlState.flushTxOnExit     = options.flushTxOnExit;
-    cmdlState.running           = 0;
-    cmdlState.exec              = 0;
-    cmdlState.initialized       = 1;
+    cmdlState.flushRxAfterExec = options.flushRxAfterExec;
+    cmdlState.initialized = 1;
+
     return(CMDL_OK);
 }
 
@@ -320,9 +297,12 @@ int8_t CMDL_Init(UART_HandleT uartHandle, CMDL_OptionsT options)
 *******************************************************************************
 ** \brief   Test whether CMDL is initialized.
 **
+** \return  - 1 if CMDL is initialized.
+**          - 0 if CMDL is not initialized.
+**
 *******************************************************************************
 */
-int8_t CMDL_IsInitialized(void)
+uint8_t CMDL_IsInitialized(void)
 {
     return(cmdlState.initialized);
 }
@@ -338,7 +318,7 @@ int8_t CMDL_IsInitialized(void)
 **                  This parameter is active if the CMDL_USAGE_STRING_SUPPORT
 **                  switch in cmdl.h is activated.
 **                  Provide some additional information how to use the command,
-**                  such as "foo <bar> [optArg]" for the command foo with
+**                  such as "foo <bar> <[optArg]>" for the command foo with
 **                  mandatory argument bar and optional argument optArg.
 **
 ** \return
@@ -352,12 +332,12 @@ int8_t CMDL_IsInitialized(void)
 *******************************************************************************
 */
 #if CMDL_USAGE_STRING_SUPPORT
-int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
-                            char* namePtr,
-                            char* usagePtr)
+uint8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
+                             char* namePtr,
+                             char* usagePtr)
 #else //CMDL_USAGE_STRING_SUPPORT
-int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
-                            char* namePtr)
+uint8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
+                             char* namePtr)
 #endif // CMDL_USAGE_STRING_SUPPORT
 {
     uint8_t ii;
@@ -374,7 +354,7 @@ int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
         if(cmdlCmdArray[ii].namePtr == NULL)
         {
 #if CMDL_DEBUG
-            printf(CMDL_LABEL "registering command: %s\n", namePtr);
+            printf(CMDL_LABEL_DEBUG "Registering command: %s\n", namePtr);
 #endif // CMDL_DEBUG
             cmdlCmdArray[ii].funcPtr = funcPtr;
             cmdlCmdArray[ii].namePtr = namePtr;
@@ -389,90 +369,86 @@ int8_t CMDL_RegisterCommand(void (*funcPtr) (uint8_t argc, char* argv[]),
 
 /*!
 *******************************************************************************
-** \brief   Run the commandline.
+** \brief   Print the prompt of the command line interface. This function
+**          should be called once after application startup and after every
+**          execution of CMDL_Execute().
 **
-**          The command line prompt appears and is waiting for commands.
-**          In order to exit the command line, type \c exit.
+** \param   prefixStr   Optional prefix string.
+**
 *******************************************************************************
 */
-void CMDL_Run(void)
+void CMDL_PrintPrompt(char* prefixStr)
 {
-    // points to arguments passed, 1 argument for argv[0] as command name string:
+    // Print the prompt:
+    //UART_TxField((uint8_t*)cmdlPromptStr, strlen(cmdlPromptStr));
+    if (prefixStr)
+    {
+        printf("\n[%s] %s", prefixStr, cmdlPromptStr);
+    }
+    else
+    {
+        printf("\n%s", cmdlPromptStr);
+    }
+    return;
+}
+
+/*!
+*******************************************************************************
+** \brief   Execute a command. The execution of this function should be
+**          triggered by cmdlExecTriggerPtr, which is passed during
+**          initialization. However, it shouldn't be called directly from
+**          cmdlExecTriggerPtr, as the latter runs in interrupt context.
+**
+*******************************************************************************
+*/
+void CMDL_Execute(void)
+{
+    // Points to arguments passed, 1 argument for argv[0] as command name string:
     char*    argv[CMDL_MAX_ARGUMENT_COUNT + 1];
     uint8_t  argc; // count of parameters, including command name string
     uint8_t  cmd_len; // length of the received command string
     char*    tok_ptr; // points to received tokens
     cmdlCommandT* command_ptr; // points to the command to execute
 
-    // init local state:
-    cmdlState.running = 1;
-    cmdlState.exec = 0;
+    // Read the command from rx buffer into CMDL's command buffer:
+    memset(cmdlCmdString, 0, sizeof(cmdlCmdString));
+    cmd_len = UART_RxField(cmdlUartHandle,
+                           (uint8_t*)cmdlCmdString,
+                           CMDL_MAX_COMMAND_LENGTH);
+    cmdlCmdString[cmd_len] = '\0'; // terminate string
 
-    // print the prompt:
-    //UART_TxField(cmdlUartHandle, (uint8_t*)cmdlPromptStr, strlen(cmdlPromptStr));
-    printf(cmdlPromptStr);
-
-    // discard the rx buffer:
-    UART_RxDiscard(cmdlUartHandle);
-
-    while(cmdlState.running)
+    // Remove carriage return in case of CR+LF
+    if(cmdlCmdString[cmd_len - 1] == 0x0D) // carriage return
     {
-        if(cmdlState.exec) // start execution
-        {
-            // read the command from rx buffer into CMDL's command buffer:
-            memset(cmdlCmdString, 0, sizeof(cmdlCmdString));
-            cmd_len = UART_RxField(cmdlUartHandle,
-                                   (uint8_t*)cmdlCmdString,
-                                   CMDL_MAX_COMMAND_LENGTH);
-            cmdlCmdString[cmd_len] = '\0'; // terminate string
-            
-            // Remove carriage return in case of CR+LF
-            if(cmdlCmdString[cmd_len - 1] == 0x0D) // carriage return
-            {
-                cmdlCmdString[cmd_len - 1] = '\0';
-            }
-
-            // parse the string into tokens:
-            argc = 0;
-            memset(argv, 0, sizeof(argv));
-            tok_ptr = strtok (cmdlCmdString, " ");
-            while((tok_ptr != NULL) && (argc <= CMDL_MAX_ARGUMENT_COUNT))
-            {
-                argv[argc++] = tok_ptr;
-                tok_ptr = strtok (NULL, " ");
-            }
-#if CMDL_DEBUG
-            cmdlDumpCmdString();
-#endif // CMDL_DEBUG
-            command_ptr = cmdlFindCommand(argv[0]);
-            if(command_ptr != NULL)
-            {
-                // execute the command:
-                command_ptr->funcPtr(argc, argv);
-            }
-            else if (argc) // print only if anything typed:
-            {
-                printf(CMDL_LABEL "unknown command: %s\n", argv[0]);
-            }
-
-            // print the prompt:
-            //UART_TxField((uint8_t*)cmdlPromptStr, strlen(cmdlPromptStr));
-            if(cmdlState.running)
-            {
-                printf(cmdlPromptStr);
-            }
-            if(cmdlState.flushRxAfterExec)
-            {
-                // Discard the receive buffer before next execution starts:
-                UART_RxDiscard(cmdlUartHandle);
-            }
-            cmdlState.exec = 0;
-        }
+        cmdlCmdString[cmd_len - 1] = '\0';
     }
-    // flush the tx buffer:
-    if(cmdlState.flushTxOnExit)
+
+    // Parse the string into tokens:
+    argc = 0;
+    memset(argv, 0, sizeof(argv));
+    tok_ptr = strtok (cmdlCmdString, " ");
+    while((tok_ptr != NULL) && (argc <= CMDL_MAX_ARGUMENT_COUNT))
     {
-        UART_TxFlush(cmdlUartHandle);
+        argv[argc++] = tok_ptr;
+        tok_ptr = strtok (NULL, " ");
+    }
+#if CMDL_DEBUG
+    cmdlDumpCmdString();
+#endif // CMDL_DEBUG
+    command_ptr = cmdlFindCommand(argv[0]);
+    if(command_ptr != NULL)
+    {
+        // Execute the command:
+        command_ptr->funcPtr(argc, argv);
+    }
+    else if (argc) // Print only if anything typed:
+    {
+        printf(CMDL_LABEL "Unknown command: %s\n", argv[0]);
+    }
+    if(cmdlState.flushRxAfterExec)
+    {
+        // Discard the receive buffer before next execution starts:
+        UART_RxDiscard(cmdlUartHandle);
     }
     return;
 }

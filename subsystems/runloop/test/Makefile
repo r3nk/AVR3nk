@@ -1,0 +1,110 @@
+################################################################
+##
+## Mandatory settings for an APPLICATION:
+## - APPLICATION
+## - TOPDIR
+## - SUBDIR
+## - SOURCES
+## - HEADERS
+## - LIBRARIES
+## - DEPBUILDS_ITERATIVE
+## - DEPBUILDS_RECURSIVE
+## - MCU
+##
+## Available Make targets:
+## all [default], clean, build, size, program
+##
+## Copyright (C) 2014-2014 Robin Klose
+##
+## This file is part of AVR3nk, available at
+## https://github.com/r3nk/AVR3nk
+##
+################################################################
+
+APPLICATION := runloop-test
+
+################################################################
+## Directory Settings
+################################################################
+
+TOPDIR := ../../..
+SUBDIR := subsystems/runloop/test
+
+################################################################
+## Sources
+################################################################
+
+SOURCES := src/main.c
+
+################################################################
+## Module Configuration
+################################################################
+
+APP_MACROS := F_CPU=18432000
+APP_MACROS += UART_ERROR_HANDLING=0
+APP_MACROS += UART_BUFFER_LENGTH_RX=128
+APP_MACROS += UART_BUFFER_LENGTH_TX=128
+APP_MACROS += UART_RX_CALLBACK_COUNT=5
+APP_MACROS += UART_INTERRUPT_SAFETY=0
+APP_MACROS += CMDL_MAX_COMMAND_LENGTH=64
+APP_MACROS += CMDL_MAX_COMMAND_COUNT=16
+APP_MACROS += CMDL_MAX_ARGUMENT_COUNT=16
+APP_MACROS += CMDL_DEBUG=0
+APP_MACROS += CMDL_USAGE_STRING_SUPPORT=0
+APP_MACROS += TIMER_INTERRUPT_SAFETY=0
+APP_MACROS += TIMER_WITH_COUNTDOWN=0
+APP_MACROS += TIMER_COUNTDOWN_IMPRECISION=256
+APP_MACROS += SPI_M_LED_MODE=0
+APP_MACROS += SPI_M_LED=B,1
+APP_MACROS += SPI_M_DEBUG=0
+APP_MACROS += MCP2515_CAN_2_B_SUPPORT=0
+APP_MACROS += MCP2515_ERROR_CALLBACK_SUPPORT=0
+APP_MACROS += MCP2515_CS=B,4
+APP_MACROS += MCP2515_INT_MAIN=B,2
+APP_MACROS += MCP2515_INTNO_MAIN=2
+APP_MACROS += MCP2515_USE_RX_INT=0
+APP_MACROS += MCP2515_INT_RXB0=D,2
+APP_MACROS += MCP2515_INTNO_RXB0=0
+APP_MACROS += MCP2515_INT_RXB1=D,3
+APP_MACROS += MCP2515_INTNO_RXB1=1
+APP_MACROS += MCP2515_DEBUG=0
+APP_MACROS += RUNLOOP_MAX_NUMBER_OF_TASKS=4
+APP_MACROS += RUNLOOP_WITH_CMDL=1
+APP_MACROS += RUNLOOP_WITH_UPTIME=1
+APP_MACROS += RUNLOOP_UPTIME_UPDATE_INTERVAL_MS=1000
+APP_MACROS += RUNLOOP_INTERRUPT_SAFETY=1
+APP_MACROS += RUNLOOP_DEBUG=0
+
+################################################################
+## Pre-built Libraries
+################################################################
+
+# Add floating point support for printf:
+LIBRARIES := printf_flt
+LIBRARIES += m
+LDFLAGS_USER += -Wl,-u,vfprintf
+
+################################################################
+## Dependency Builds
+################################################################
+
+# Specify all dependencies in the correct build order:
+DEPBUILDS_ITERATIVE := drivers/buffer
+DEPBUILDS_ITERATIVE += drivers/uart
+DEPBUILDS_ITERATIVE += drivers/timer
+DEPBUILDS_ITERATIVE += drivers/spi
+DEPBUILDS_ITERATIVE += drivers/mcp2515
+DEPBUILDS_ITERATIVE += subsystems/cmdl
+DEPBUILDS_ITERATIVE += subsystems/runloop
+
+################################################################
+## Target MCU(s) (first MCU in list is used for programming)
+################################################################
+
+MCU := atmega644p
+
+################################################################
+## Load Configuration
+################################################################
+
+include $(TOPDIR)/env/make/Make.conf

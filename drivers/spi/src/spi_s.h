@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -61,13 +61,16 @@
 //*****************************************************************************
 
 /*! SPI_S specific error base */
-#define SPI_S_ERR_BASE              0
+#ifndef SPI_S_ERR_BASE
+#define SPI_S_ERR_BASE              35
+#endif
+
 
 /*! SPI_S returns with no errors. */
 #define SPI_S_OK                    0
 
 /*! A bad parameter has been passed. */
-#define SPI_S_ERR_BAD_PARAMETER     SPI_S_ERR_BASE - 1
+#define SPI_S_ERR_BAD_PARAMETER     SPI_S_ERR_BASE + 0
 
 
 //*****************************************************************************
@@ -80,10 +83,10 @@ typedef void (*SPI_S_CallbackT) (uint8_t byte);
 //************************* FUNCTION DECLARATIONS *****************************
 //*****************************************************************************
 
-int8_t  SPI_S_Init (SPI_DataOrderT dataOrder,
+uint8_t SPI_S_Init (SPI_DataOrderT dataOrder,
                     SPI_ClockPolarityT clockParity,
                     SPI_ClockPhaseT clockPhase);
-int8_t  SPI_S_IsInitialized (void);
+uint8_t SPI_S_IsInitialized (void);
 void    SPI_S_SetCallback (SPI_S_CallbackT callback);
 void    SPI_S_SetSendByte (uint8_t byte);
 

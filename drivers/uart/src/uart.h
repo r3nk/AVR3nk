@@ -5,7 +5,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -42,14 +42,16 @@
 #define UART_RX_CALLBACK_COUNT  3
 #endif
 
-//! Set to 1 if UART functions should be called from within ISRs.
+//! Set to 1 if UART functions will be called from within other ISRs.
 #ifndef UART_INTERRUPT_SAFETY
 #define UART_INTERRUPT_SAFETY   1
 #endif
 
-//! Set to 1 to enable nested interrupts within rx callback functions. 
+/*! Set to 1 to enable nested interrupts within rx callback functions.
+**  This setting is NOT recommended and may lead to race conditions.
+**  Make sure that you know ALL implications before you enable this! */
 #ifndef UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS
-#define UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS   1
+#define UART_ENABLE_RX_CALLBACK_NESTED_INTERRUPTS   0
 #endif
 
 //! CPU frequency
@@ -62,19 +64,21 @@
 //*****************************************************************************
 
 /*! UART specific error base */
-#define UART_ERR_BASE               0
+#ifndef UART_ERR_BASE
+#define UART_ERR_BASE               20
+#endif
 
 /*! UART returns with no errors. */
 #define UART_OK                     0
 
 /*! A bad parameter has been passed. */
-#define UART_ERR_BAD_PARAMETER      UART_ERR_BASE - 1
+#define UART_ERR_BAD_PARAMETER      UART_ERR_BASE + 0
 
 /*! There is no callback slot free. */
-#define UART_ERR_NO_CALLBACK_SLOT   UART_ERR_BASE - 2
+#define UART_ERR_NO_CALLBACK_SLOT   UART_ERR_BASE + 1
 
 /*! The callback function has not been found. */
-#define UART_ERR_CALLBACK_NOT_FOUND UART_ERR_BASE - 3
+#define UART_ERR_CALLBACK_NOT_FOUND UART_ERR_BASE + 2
 
 
 //*****************************************************************************
@@ -84,6 +88,7 @@
 /*! UART handle, which corresponds to a particular UART port. */
 typedef void* UART_HandleT;
 
+/*! UART port identifier for devices with multiple UART ports. */
 typedef enum
 {
     UART_InterfaceId0 = 0,
@@ -153,6 +158,12 @@ typedef struct
     uint8_t           rxLedIdx : 3;
 } UART_LedParamsT;
 
+/*! Signature of a RX trigger callback. */
+typedef void (*UART_RxTriggerCallbackT) (void* optArgPtr, uint8_t rxByte);
+
+/*! Signature of a RX callback. */
+typedef void (*UART_RxCallbackT) (void* optArgPtr);
+
 /*! UART specific callback options. */
 typedef struct
 {
@@ -177,20 +188,22 @@ UART_HandleT UART_Init (UART_InterfaceIdT id,
                         UART_CharSizeT    charSizeMode,
                         UART_TransceiveT  transceiveMode,
                         UART_LedParamsT*  ledParamsPtr);
-int8_t  UART_IsInitialized(UART_HandleT handle);
-int8_t  UART_RegisterRxTriggerCallback(UART_HandleT handle,
-                                       void (*funcPtr)(void* optArgPtr, 
-                                                       uint8_t rxByte), 
+uint8_t UART_IsInitialized(UART_HandleT handle);
+uint8_t UART_RegisterRxTriggerCallback(UART_HandleT handle,
+                                       UART_RxTriggerCallbackT funcPtr,
                                        void* optArgPtr,
                                        UART_RxCallbackOptionsT options);
-int8_t  UART_UnregisterRxTriggerCallback(UART_HandleT handle);
-int8_t  UART_RegisterRxCallback(UART_HandleT handle, 
+uint8_t UART_UnregisterRxTriggerCallback(UART_HandleT handle);
+
+#if UART_RX_CALLBACK_COUNT
+uint8_t UART_RegisterRxCallback(UART_HandleT handle,
                                 uint8_t rxByte,
-                                void (*funcPtr)(void* optArgPtr), 
+                                UART_RxCallbackT funcPtr,
                                 void* optArgPtr,
                                 UART_RxCallbackOptionsT options);
-int8_t  UART_UnregisterRxCallback(UART_HandleT handle, uint8_t rxByte);
-void    UART_RxCallbackOnBackspace(void* optArgPtr); 
+uint8_t UART_UnregisterRxCallback(UART_HandleT handle, uint8_t rxByte);
+void    UART_RxCallbackOnBackspace(void* optArgPtr);
+#endif // UART_RX_CALLBACK_COUNT
 
 void    UART_TxByte(UART_HandleT handle, uint8_t byte);
 uint8_t UART_RxByte(UART_HandleT handle);

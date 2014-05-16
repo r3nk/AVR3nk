@@ -9,7 +9,7 @@
 **
 ** \author  Robin Klose
 **
-** Copyright (C) 2009-2013 Robin Klose
+** Copyright (C) 2009-2014 Robin Klose
 **
 ** This file is part of AVR3nk, available at https://github.com/r3nk/AVR3nk
 **
@@ -44,6 +44,8 @@
 static int8_t appInit(void);
 static int    appStdioPut(char chr, FILE* streamPtr);
 static int    appStdioGet(FILE* streamPtr);
+static void   appCmdlExec(void* optArgPtr);
+static void   appCmdlStop(uint8_t argc, char* argv[]);
 static void   appPrintCanMsg(MCP2515_CanMessageT* msgPtr);
 static void   appListenAbortFunc(void* optArgPtr);
 static void   appCmdSetSamplePointCount(uint8_t argc, char* argv[]);
@@ -61,13 +63,16 @@ static void   appCmdListenCAN(uint8_t argc, char* argv[]);
 //*****************************************************************************
 
 static UART_HandleT appUartHandle = NULL;
+static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
+static MCP2515_InitParamsT appCanParams;
 static struct
 {
     uint8_t canInitialized : 1;
-} appState;
-static FILE appStdio = FDEV_SETUP_STREAM(appStdioPut, appStdioGet, _FDEV_SETUP_RW);
-static MCP2515_InitParamsT appCanParams;
-static volatile uint8_t appListenAbort = 0;
+    volatile uint8_t listenAbort : 1;
+    volatile uint8_t cmdlRunning : 1;
+    volatile uint8_t cmdlExec : 1;
+} appFlags;
+
 
 //*****************************************************************************
 //**************************** LOCAL FUNCTIONS ********************************
@@ -82,7 +87,7 @@ static volatile uint8_t appListenAbort = 0;
 **
 ** \return
 **          - 0 on success.
-**          - -1 on error.
+**          - 1 on error.
 **
 *******************************************************************************
 */
@@ -91,9 +96,9 @@ static int8_t appInit(void)
     UART_LedParamsT led_params;
     UART_RxCallbackOptionsT cb_opts;
     CMDL_OptionsT cmdl_options;
-    int8_t result;
+    uint8_t result;
 
-    // initialize UART and STDIO:
+    // Initialize UART and STDIO:
     memset(&led_params, 0, sizeof(led_params));
     led_params.txLedPortPtr = &PORTA;
     led_params.txLedDdrPtr  = &DDRA;
@@ -111,40 +116,40 @@ static int8_t appInit(void)
                               &led_params);
     if(appUartHandle == NULL)
     {
-        return(-1);
+        return(1);
     }
 
-    // assign stdio:
+    // Assign stdio:
     stdout = &appStdio;
     stdin  = &appStdio;
 
-    // register listen abort function:
+    // Register listen abort function:
     memset(&cb_opts, 0, sizeof(cb_opts));
     cb_opts.execOnRxWait = 1;
     cb_opts.writeRxToBuffer = 1;
-    result = UART_RegisterRxCallback(appUartHandle, 'q', 
+    result = UART_RegisterRxCallback(appUartHandle, 'q',
                                      appListenAbortFunc, NULL, cb_opts);
     if(result != UART_OK)
     {
         printf("UART_RegisterRxCallback: %d\n", result);
-        return(-1);
+        return(1);
     }
 
-    // enable interrupts:
+    // Enable interrupts:
     sei();
 
-    // initialize CMDL:
+    // Initialize CMDL:
     memset(&cmdl_options, 0, sizeof(cmdl_options));
     cmdl_options.flushRxAfterExec = 1;
-    cmdl_options.flushTxOnExit = 1;
-    result = CMDL_Init(appUartHandle, cmdl_options);
+    result = CMDL_Init(appUartHandle, &appCmdlExec, cmdl_options);
     if(result != CMDL_OK)
     {
         printf("CMDL_Init: %d\n", result);
-        return(-1);
+        return(1);
     }
 
-    // register commands:
+    // Register commands:
+    CMDL_RegisterCommand(appCmdlStop, "exit");
     CMDL_RegisterCommand(appCmdSetSamplePointCount, "setsamplepoints");
     CMDL_RegisterCommand(appCmdSetRolloverMode, "setrollover");
     CMDL_RegisterCommand(appCmdSetOneshotMode, "setoneshot");
@@ -155,7 +160,7 @@ static int8_t appInit(void)
     CMDL_RegisterCommand(appCmdSendMessage, "send");
     CMDL_RegisterCommand(appCmdListenCAN, "listen");
 
-    // set up CAN driver:
+    // Set up CAN driver:
     memset(&appCanParams, 0, sizeof(appCanParams));
     appCanParams.initSPI = 1;
     appCanParams.wakeupLowPassFilter = 0;
@@ -165,7 +170,7 @@ static int8_t appInit(void)
     appCanParams.phaseSegment1Length = MCP2515_AUTO_PHSEG1;
     appCanParams.phaseSegment2Length = MCP2515_AUTO_PHSEG2;
 
-    // presettings of configurable arguments:
+    // Presettings of configurable arguments:
     appCanParams.samplePointCount = MCP2515_SAM_3;
     appCanParams.rolloverMode = MCP2515_ROLLOVER_ENABLE;
     appCanParams.oneShotMode = MCP2515_ONESHOT_DISABLE;
@@ -215,6 +220,35 @@ static int appStdioGet(FILE* streamPtr)
 
 /*!
 *******************************************************************************
+** \brief   Trigger commandline execution.
+**
+** \param   optArgPtr   Not used. Satisfies the interface as a UART callback.
+**
+*******************************************************************************
+*/
+static void appCmdlExec(void* optArgPtr)
+{
+    appFlags.cmdlExec = 1;
+    return;
+}
+
+/*!
+*******************************************************************************
+** \brief   Stop the commandline.
+**
+** \param   argc    Not used.
+** \param   argv    Not used.
+**
+*******************************************************************************
+*/
+static void appCmdlStop(uint8_t argc, char* argv[])
+{
+    appFlags.cmdlRunning = 0;
+    return;
+}
+
+/*!
+*******************************************************************************
 ** \brief   Print a CAN message in standard format (2.0A) via UART.
 **
 ** \param   msgPtr  Pointer to a CAN message.
@@ -236,7 +270,7 @@ static void appPrintCanMsg(MCP2515_CanMessageT* msgPtr)
 
 /*!
 *******************************************************************************
-** \brief   Set the appListenAbort flag.
+** \brief   Set the listenAbort flag.
 **
 ** \param   optArgPtr   Not used.
 **
@@ -245,7 +279,7 @@ static void appPrintCanMsg(MCP2515_CanMessageT* msgPtr)
 static void appListenAbortFunc(void* optArgPtr)
 {
     optArgPtr = optArgPtr;
-    appListenAbort = 1;
+    appFlags.listenAbort = 1;
     return;
 }
 
@@ -278,7 +312,7 @@ static void appCmdSetSamplePointCount(uint8_t argc, char* argv[])
             return;
         }
     }
-    printf("usage: setsamplepoints <cnt>\n" \
+    printf("Usage: setsamplepoints <cnt>\n" \
            "where cnt is either 1 or 3. (default: 3)\n");
     return;
 }
@@ -300,12 +334,12 @@ static void appCmdSetRolloverMode(uint8_t argc, char* argv[])
     if(cnt)
     {
         appCanParams.rolloverMode = MCP2515_ROLLOVER_ENABLE;
-        printf("rollover enabled\n");
+        printf("Rollover enabled.\n");
     }
     else
     {
         appCanParams.rolloverMode = MCP2515_ROLLOVER_DISABLE;
-        printf("rollover disabled\n");
+        printf("Rollover disabled.\n");
     }
     return;
 }
@@ -327,12 +361,12 @@ static void appCmdSetOneshotMode(uint8_t argc, char* argv[])
     if(cnt)
     {
         appCanParams.oneShotMode = MCP2515_ONESHOT_ENABLE;
-        printf("oneshot enabled\n");
+        printf("Oneshot enabled.\n");
     }
     else
     {
         appCanParams.oneShotMode = MCP2515_ONESHOT_DISABLE;
-        printf("oneshot disabled\n");
+        printf("Oneshot disabled.\n");
     }
     return;
 }
@@ -370,7 +404,7 @@ static void appCmdSetMask(uint8_t argc, char* argv[])
             return;
         }
     }
-    printf("usage: setmask <idx> <value>\n" \
+    printf("Usage: setmask <idx> <value>\n" \
            "where idx is either 0 or 1.\n");
     return;
 }
@@ -431,7 +465,7 @@ static void appCmdSetFilter(uint8_t argc, char* argv[])
             return;
         }
     }
-    printf("usage: setfilter <idx> <value>\n" \
+    printf("Usage: setfilter <idx> <value>\n" \
            "where idx is in the range of 0 - 5 inclusively.\n");
     return;
 }
@@ -447,7 +481,7 @@ static void appCmdSetFilter(uint8_t argc, char* argv[])
 */
 static void appCmdInit(uint8_t argc, char* argv[])
 {
-    int8_t result;
+    uint8_t result;
 
     printf("Initializing MCP2515...");
     result = MCP2515_Init(&appCanParams);
@@ -457,8 +491,8 @@ static void appCmdInit(uint8_t argc, char* argv[])
     }
     else
     {
-        printf("ok\n");
-        appState.canInitialized = 1;
+        printf("ok.\n");
+        appFlags.canInitialized = 1;
     }
     return;
 }
@@ -474,19 +508,10 @@ static void appCmdInit(uint8_t argc, char* argv[])
 */
 static void appCmdExit(uint8_t argc, char* argv[])
 {
-    int8_t result;
-
     printf("Exiting MCP2515...");
-    result = MCP2515_Exit();
-    if(result)
-    {
-        printf("error: %d\n", result);
-    }
-    else
-    {
-        printf("ok\n");
-        appState.canInitialized = 0;
-    }
+    MCP2515_Exit();
+    printf("ok.\n");
+    appFlags.canInitialized = 0;
     return;
 }
 
@@ -503,9 +528,10 @@ static void appCmdSendMessage(uint8_t argc, char* argv[])
 {
     MCP2515_CanAMessageT can_msg;
     MCP2515_TxParamsT can_params;
+    MCP2515_TxBufferIdT buffer_id;
     int8_t ii;
 
-    if(appState.canInitialized == 0)
+    if(appFlags.canInitialized == 0)
     {
         printf("MCP2515 not initialized.\n");
         return;
@@ -522,7 +548,7 @@ static void appCmdSendMessage(uint8_t argc, char* argv[])
         }
         can_params.bufferId = MCP2515_TX_BUFFER_0;
         can_params.priority = MCP2515_TX_PRIORITY_0;
-        printf("message to send: \n");
+        printf("Message to send: \n");
         printf("SID: 0x%03x\n", can_msg.sid);
         printf("RTR: %d\n", can_msg.rtr);
         printf("DLC: %d\n", can_msg.dlc);
@@ -531,13 +557,28 @@ static void appCmdSendMessage(uint8_t argc, char* argv[])
         {
             printf("0x%02X ", can_msg.dataArray[ii]);
         }
-        printf("\nsending message...");
-        ii = MCP2515_Transmit(&can_msg, can_params);
-        if(ii) printf("error: %d\n", ii);
-        else printf("ok\n");
+        printf("\nSending message...");
+        buffer_id = MCP2515_Transmit(&can_msg, can_params);
+        if(buffer_id == 0) printf("error: No transmit buffer free.\n");
+        else
+        {
+            switch (buffer_id)
+            {
+                case (MCP2515_TX_BUFFER_0):
+                    ii = 0;
+                    break;
+                case (MCP2515_TX_BUFFER_1):
+                    ii = 1;
+                    break;
+                case (MCP2515_TX_BUFFER_2):
+                    ii = 2;
+                    break;
+            }
+            printf("ok. Transmit buffer: %i\n", ii);
+        }
         return;
     }
-    printf("usage: send <SID> <RTR> <DLC> <DATA>*\n");
+    printf("Usage: send <SID> <RTR> <DLC> <DATA>*\n");
     return;
 }
 
@@ -553,7 +594,7 @@ static void appCmdSendMessage(uint8_t argc, char* argv[])
 */
 static void appCmdListenCAN (uint8_t argc, char* argv[])
 {
-    if(appState.canInitialized == 0)
+    if(appFlags.canInitialized == 0)
     {
         printf("MCP2515 not initialized.\n");
         return;
@@ -564,10 +605,10 @@ static void appCmdListenCAN (uint8_t argc, char* argv[])
     printf(" I  T L\n");
     printf(" D  R C   data\n");
     printf("#################################\n");
-    appListenAbort = 0;
+    appFlags.listenAbort = 0;
     MCP2515_SetRxCallback(appPrintCanMsg);
-    while(!appListenAbort);
-    appListenAbort = 0;
+    while(!appFlags.listenAbort);
+    appFlags.listenAbort = 0;
     MCP2515_SetRxCallback(NULL);
     return;
 }
@@ -587,14 +628,31 @@ static void appCmdListenCAN (uint8_t argc, char* argv[])
 **
 ** \return
 **          - 0 on success.
-**          - -1 on error.
+**          - 1 on error.
 **
 *******************************************************************************
 */
 int main(int argc, char* argv[])
 {
-    if(appInit()) return(-1);
-    CMDL_Run();
+    if(appInit()) return(1);
+
+    // Init CMDL state:
+    appFlags.cmdlRunning = 1;
+    appFlags.cmdlExec = 0;
+
+    // Print the prompt:
+    CMDL_PrintPrompt(NULL);
+
+    // Wait for commands:
+    while(appFlags.cmdlRunning)
+    {
+        if(appFlags.cmdlExec) // start execution
+        {
+            CMDL_Execute();
+            CMDL_PrintPrompt(NULL);
+            appFlags.cmdlExec = 0;
+        }
+    }
     UART_TxFlush(appUartHandle);
     return(0);
 }

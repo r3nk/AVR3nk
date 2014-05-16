@@ -4,7 +4,7 @@
 ##
 ## Copyright (C) 2009-2013 Robin Klose
 ##
-## This file is part of AVR3nk, available at 
+## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
 ##
 ################################################################
@@ -35,7 +35,7 @@ SPACE := $(EMPTY) $(EMPTY)
 NEWLINE := \n
 PREFIX := \[$(SUBDIR)\]
 
-# Behavior for avrdude specific targets: 
+# Behavior for avrdude specific targets:
 ifndef TARGET_MCU
 TARGET_MCU := $(firstword $(MCU))
 endif

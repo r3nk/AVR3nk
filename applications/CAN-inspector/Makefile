@@ -11,12 +11,12 @@
 ## - DEPBUILDS_RECURSIVE
 ## - MCU
 ##
-## Available Make targets: 
+## Available Make targets:
 ## all [default], clean, build, size, program
 ##
 ## Copyright (C) 2009-2013 Robin Klose
 ##
-## This file is part of AVR3nk, available at 
+## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
 ##
 ################################################################
@@ -71,20 +71,20 @@ APP_MACROS += MCP2515_DEBUG=0
 ## Pre-built Libraries
 ################################################################
 
-LIBRARIES := 
+LIBRARIES :=
 
 ################################################################
 ## Dependency Builds
 ################################################################
 
-# Specify all dependencies in the correct build order: 
+# Specify all dependencies in the correct build order:
 DEPBUILDS_ITERATIVE := drivers/buffer
 DEPBUILDS_ITERATIVE += drivers/uart
 DEPBUILDS_ITERATIVE += drivers/spi
 DEPBUILDS_ITERATIVE += drivers/mcp2515
 DEPBUILDS_ITERATIVE += subsystems/cmdl
 
-# Specify the latest dependency to build dependencies recursively: 
+# Specify the latest dependency to build dependencies recursively:
 #DEPBUILDS_RECURSIVE := subsystems/cmdl
 #DEPBUILDS_RECURSIVE += drivers/mcp2515
 

@@ -53,15 +53,15 @@
 #define SET_LOW(x)          _xSET_LOW(x)
 #define _xSET_LOW(x,y)      PORT(x) &= ~(1 << (y))
 
-//! Determine pin setting
+//! Determine pin setting:
 #define PIN_IS(x)           _xPIN_IS(x)
 #define _xPIN_IS(x,y)       ( ( PIN(x) & ( 1 << (y) ) ) >> (y) )
 
-//! See if the pin is high
+//! See if the pin is high:
 #define IS_HIGH(x)          _xIS_HIGH(x)
 #define _xIS_HIGH(x,y)      ((PIN(x) & (1 << (y))) != 0)
 
-//! See if the pin is low
+//! See if the pin is low:
 #define IS_LOW(x)           _xIS_LOW(x)
 #define _xIS_LOW(x,y)       ((PIN(x) & (1 << (y))) == 0)
 

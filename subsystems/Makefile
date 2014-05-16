@@ -5,12 +5,12 @@
 ## - SUBDIR
 ## - DIRECTORIES
 ##
-## Available Make targets: 
+## Available Make targets:
 ## all [default], clean, headers, build, install
 ##
-## Copyright (C) 2009-2013 Robin Klose
+## Copyright (C) 2009-2014 Robin Klose
 ##
-## This file is part of AVR3nk, available at 
+## This file is part of AVR3nk, available at
 ## https://github.com/r3nk/AVR3nk
 ##
 ################################################################
@@ -23,6 +23,7 @@ TOPDIR = ..
 SUBDIR = subsystems
 
 DIRECTORIES := cmdl
+DIRECTORIES += runloop
 
 ################################################################
 ## Load Configuration

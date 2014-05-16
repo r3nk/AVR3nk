@@ -1,12 +1,12 @@
 ################################################################################
 ##
-## This file contains default configuration options for the environment. 
-## User specific configuration files are named config.mak.user, 
-## where 'user' is the value returned by echo %username% on a windows 
+## This file contains default configuration options for the environment.
+## User specific configuration files are named config.mak.user,
+## where 'user' is the value returned by echo %username% on a windows
 ## command line or echo $username on a linux shell without any whitespaces.
 ##
-## Each configuration setting should be accomplished by a ?= assignment, 
-## so that options can be overridden on the command line. 
+## Each configuration setting should be accomplished by a ?= assignment,
+## so that options can be overridden on the command line.
 ##
 ## Copyright (C) 2009-2013 Robin Klose
 ##
